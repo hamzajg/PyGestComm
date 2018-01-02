@@ -15,7 +15,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from GestCommApp import views
 
 urlpatterns = [
+    path('api/client', views.ClientList.as_view()),
     path('admin/', admin.site.urls),
 ]
