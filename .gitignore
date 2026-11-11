@@ -41,7 +41,6 @@ pip-delete-this-directory.txt
 
 # Developers
 *.sw*
-manage.py
 .DS_Store
 bin/
 include/
