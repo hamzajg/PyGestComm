@@ -12,10 +12,7 @@ class Client(models.Model):
     numTelClient1 = models.IntegerField()
     numTelClient2 = models.IntegerField()
 
-    def __init__(self, codeClient):
-        self.codeClient = codeClient
-
-    def __str(self):
+    def __str__(self):
         return '%d: %s' % (self.idClient, self.codeClient)
 
     class Meta:
