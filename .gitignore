@@ -45,4 +45,6 @@ pip-delete-this-directory.txt
 bin/
 include/
 pip-selfcheck.json
-src/GestCommApp/db.sqlite3
+# Local development database
+*.sqlite3
+src/GestCommProject/db.sqlite3
