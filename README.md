@@ -60,6 +60,9 @@ export DJANGO_ALLOWED_HOSTS=example.com
 python manage.py test
 ```
 
+5 tests: the client model's string form, and the client endpoint listing every
+field in code order, creating a client, and rejecting one without a code.
+
 ## Status
 
 The project has been moved to a supported Django and DRF line, and the
