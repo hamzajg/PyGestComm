@@ -12,8 +12,8 @@ write it.
 
 ## Tech stack
 
-- Python 3 / Django 2.x
-- Django REST Framework, `django-filter`, `django-guardian`, `markdown`, `coreapi`
+- Python 3.10+ (CI uses 3.12)
+- Django 5.2 (LTS) and Django REST Framework 3.16
 
 ## Project layout
 
@@ -60,7 +60,11 @@ export DJANGO_ALLOWED_HOSTS=example.com
 python manage.py test
 ```
 
+5 tests: the client model's string form, and the client endpoint listing every
+field in code order, creating a client, and rejecting one without a code.
+
 ## Status
 
-Legacy Django 2.x project. `requirements.txt` is unpinned; pinning it and
-upgrading to a supported Django release would be the next step.
+The project has been moved to a supported Django and DRF line, and the
+dependency list now contains only what the code imports. The API still covers
+a single client endpoint, and the model has no update/delete route yet.
