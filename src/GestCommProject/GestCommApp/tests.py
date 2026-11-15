@@ -58,3 +58,54 @@ class ClientApiTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("codeClient", response.json())
+
+
+class AssistantApiTest(APITestCase):
+    url = "/api/assistant/ask"
+
+    def setUp(self):
+        Client.objects.create(**CLIENT)
+        Client.objects.create(**{**CLIENT,
+                                 "codeClient": "C002",
+                                 "nomPrenomClient": "Grace Hopper",
+                                 "numTelClient1": 33333333,
+                                 "numTelClient2": 44444444})
+
+    def ask(self, question):
+        return self.client.post(self.url, {"question": question}, format="json")
+
+    def test_count_intent(self):
+        response = self.ask("how many clients?")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["intent"], "count")
+        self.assertEqual(body["data"]["count"], 2)
+
+    def test_search_by_code(self):
+        body = self.ask("find client C002").json()
+        self.assertEqual(body["intent"], "search")
+        self.assertEqual(len(body["data"]["clients"]), 1)
+        self.assertEqual(body["data"]["clients"][0]["codeClient"], "C002")
+
+    def test_search_by_name(self):
+        body = self.ask("find client hopper").json()
+        self.assertEqual(body["intent"], "search")
+        self.assertEqual(body["data"]["clients"][0]["nomPrenomClient"], "Grace Hopper")
+
+    def test_bare_term_searches(self):
+        body = self.ask("Ada Lovelace").json()
+        self.assertEqual(body["intent"], "search")
+        self.assertEqual(body["data"]["clients"][0]["codeClient"], "C001")
+
+    def test_search_by_phone(self):
+        body = self.ask("find client 33333333").json()
+        self.assertEqual(body["data"]["clients"][0]["codeClient"], "C002")
+
+    def test_unknown_question_falls_back_to_search_or_help(self):
+        response = self.ask("xyzzy")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(response.json()["intent"], ("search", "help"))
+
+    def test_empty_question_is_help(self):
+        body = self.ask("").json()
+        self.assertEqual(body["intent"], "help")
