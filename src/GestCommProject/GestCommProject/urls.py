@@ -19,5 +19,6 @@ from GestCommApp import views
 
 urlpatterns = [
     path('api/client', views.ClientList.as_view()),
+    path('api/assistant/ask', views.AssistantAsk.as_view()),
     path('admin/', admin.site.urls),
 ]

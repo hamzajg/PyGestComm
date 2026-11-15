@@ -43,6 +43,7 @@ Django project under `src/GestCommProject/`:
 |---|---|---|---|
 | GET | `/api/client` | none | List clients (ordered by `codeClient`) |
 | POST | `/api/client` | none | Create client |
+| POST | `/api/assistant/ask` | none | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search/help intents) |
 | * | `/admin/` | Django admin | Admin site |
 
 Client fields (`models.py`, table `client`): `idClient` (PK), `codeClient`,
