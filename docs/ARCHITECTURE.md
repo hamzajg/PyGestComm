@@ -9,11 +9,12 @@ Gest_Comm_ClientFX (desktop client, sibling repo)
         │  HTTP/JSON
         ▼
 Django 5.2 + DRF 3.16 (runserver / WSGI)
-  ├─ GestCommProject/urls.py   routes: /api/client, /admin/
+  ├─ GestCommProject/urls.py   routes: /api/client, /api/assistant/ask, /admin/
   └─ GestCommApp/
        ├─ models.py        Client (db_table="client")
        ├─ serializers.py   ClientSerializer (fields='__all__')
-       └─ views.py         ClientList — ListCreateAPIView
+       ├─ assistant.py     deterministic copilot intents (count/search)
+       └─ views.py         ClientList — ListCreateAPIView; AssistantAsk
         │
         ▼
 sqlite3 (src/GestCommProject/db.sqlite3)
@@ -41,6 +42,15 @@ appears, should follow the same thin pattern unless it genuinely grows.
   compatibility with the desktop client's expectations.
 - `unique_together = (idClient, codeClient)`, default ordering by
   `codeClient`.
+
+## Assistant endpoint
+
+`POST /api/assistant/ask {"question": "..."}` — a deterministic,
+read-only copilot (`GestCommApp/assistant.py`). Intents: `count`
+("how many clients"), `search` (find by code/name/tax-id/address/phone,
+EN+FR keywords, bare terms also search), `help` fallback. Response:
+`{intent, answer, data}`. No LLM — this is the stable tool surface a
+future model would map free text onto (ADR 0002). No write intents yet.
 
 ## Contract with the client
 
