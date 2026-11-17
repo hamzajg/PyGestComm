@@ -75,7 +75,7 @@ devis `converti` reject PUT/PATCH/DELETE with 400.
 | GET/PUT/PATCH/DELETE | `/api/facture/<id>` | Basic/session | Facture detail |
 | GET/POST | `/api/bonliv` | Basic/session | List / create delivery notes with nested `lignes` |
 | GET/PUT/PATCH/DELETE | `/api/bonliv/<id>` | Basic/session | BonLiv detail |
-| POST | `/api/assistant/ask` | Basic/session | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all four resources) |
+| POST | `/api/assistant/ask` | Basic/session | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all five resources) |
 | * | `/admin/` | Django admin | Admin site |
 
 Client fields (`models.py`, table `client`): `idClient` (PK), `codeClient`,
