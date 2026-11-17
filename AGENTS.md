@@ -56,6 +56,7 @@ replaces the whole set; omit it to keep existing lines.
 | GET/PUT/PATCH/DELETE | `/api/article/<id>` | none | Article detail |
 | GET/POST | `/api/devis` | none | List / create quotes with nested `lignes` |
 | GET/PUT/PATCH/DELETE | `/api/devis/<id>` | none | Devis detail |
+| POST | `/api/devis/<id>/convertir` | none | Convert a `valide` devis → `brouillon` facture (copies client+lines, sets devis `converti`) |
 | GET/POST | `/api/facture` | none | List / create invoices with nested `lignes` |
 | GET/PUT/PATCH/DELETE | `/api/facture/<id>` | none | Facture detail |
 | POST | `/api/assistant/ask` | none | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all four resources) |
@@ -73,7 +74,7 @@ Article fields (table `article`): `idArticle` (PK), `refArticle`,
 
 Devis fields (table `devis`): `idDevis` (PK), `codeDevis`, `dateDevis`
 (defaults to today), `client` (FK → `idClient`), `statutDevis`
-(`brouillon`/`valide`/`refuse`), `observationDevis`, `lignes`.
+(`brouillon`/`valide`/`refuse`/`converti`), `observationDevis`, `lignes`.
 
 Facture fields (table `facture`): same shape as devis plus `devis`
 (nullable FK → `idDevis`) and `statutFacture`

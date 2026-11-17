@@ -347,3 +347,59 @@ class AssistantDomainApiTest(APITestCase):
         body = self.ask("find facture D001").json()
         self.assertEqual(body["data"]["resource"], "facture")
         self.assertEqual(body["data"]["factures"][0]["codeFacture"], "F001")
+
+
+class DevisConversionApiTest(APITestCase):
+    def setUp(self):
+        self.client_obj = Client.objects.create(**CLIENT)
+        self.article = Article.objects.create(**ARTICLE)
+        self.devis = Devis.objects.create(
+            **{**DEVIS, "client": self.client_obj,
+               "statutDevis": "valide"})
+        from GestCommApp.models import LigneDevis
+        LigneDevis.objects.create(
+            devis=self.devis, article=self.article, designation="Widget",
+            quantite=2, prixUnitaire="100.00", remise=0, tva=20)
+
+    def url(self, pk):
+        return "/api/devis/%d/convertir" % pk
+
+    def test_converts_a_validated_devis_into_a_facture(self):
+        response = self.client.post(self.url(self.devis.idDevis), {},
+                                    format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["codeFacture"], "F%04d" % self.devis.idDevis)
+        self.assertEqual(body["codeDevis"], "D001")
+        self.assertEqual(body["codeClient"], "C001")
+        self.assertEqual(body["statutFacture"], "brouillon")
+        self.assertEqual(body["totalHT"], 200)
+        self.assertEqual(len(body["lignes"]), 1)
+        self.assertEqual(body["lignes"][0]["designation"], "Widget")
+
+        self.devis.refresh_from_db()
+        self.assertEqual(self.devis.statutDevis, "converti")
+        self.assertEqual(Facture.objects.count(), 1)
+
+    def test_rejects_conversion_of_a_brouillon_devis(self):
+        self.devis.statutDevis = "brouillon"
+        self.devis.save()
+
+        response = self.client.post(self.url(self.devis.idDevis), {},
+                                    format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Facture.objects.count(), 0)
+
+    def test_rejects_double_conversion(self):
+        self.client.post(self.url(self.devis.idDevis), {}, format="json")
+        response = self.client.post(self.url(self.devis.idDevis), {},
+                                    format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Facture.objects.count(), 1)
+
+    def test_unknown_devis_is_404(self):
+        response = self.client.post(self.url(999), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

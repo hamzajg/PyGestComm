@@ -36,8 +36,9 @@ README always promised:
   purchase/sale price, discount and VAT for each side,
   `dernierPrixVenteUnitaire`). Money is `DecimalField`, rates `FloatField`.
 - **Devis** — quote: `codeDevis`, `dateDevis` (defaults to today),
-  `client` FK (PROTECT), `statutDevis` (brouillon/valide/refuse),
-  `observationDevis`, plus `LigneDevis` rows.
+  `client` FK (PROTECT), `statutDevis` (brouillon/valide/refuse/converti),
+  `observationDevis`, plus `LigneDevis` rows. A `valide` devis converts
+  to a facture via `POST /api/devis/<id>/convertir`.
 - **Facture** — invoice: same shape plus `statutFacture`
   (brouillon/validee/payee/annulee) and an optional `devis` FK (PROTECT)
   recording which quote it came from, plus `LigneFacture` rows.
