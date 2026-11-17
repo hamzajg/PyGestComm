@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import os
+from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -61,7 +62,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework', 
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'GestCommApp',
 ]
 
@@ -97,19 +99,29 @@ WSGI_APPLICATION = 'GestCommProject.wsgi.application'
 
 
 REST_FRAMEWORK = {
-    # Session auth keeps the browsable API / admin working; Basic auth is
-    # what API clients (e.g. Gest_Comm_ClientFX) send as
-    # "Authorization: Basic base64(user:pass)".
+    # JWT (access/refresh) is what API clients (Gest_Comm_ClientFX) send
+    # as "Authorization: Bearer <access>"; Session stays for the
+    # browsable API / admin (no Authorization header → JWT returns
+    # None → Session takes over).
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Basic first so API clients get a proper 401 + WWW-Authenticate;
-        # Session stays for the browsable API / admin (no Authorization
-        # header → Basic returns None → Session takes over).
-        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+}
+
+SIMPLE_JWT = {
+    # Desktop-client friendly lifetimes: credentials are only sent once
+    # to /api/token; the short-lived access token limits the blast
+    # radius of a leaked token, the refresh token (rotated + blacklisted
+    # on use) keeps the session alive across app restarts.
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 

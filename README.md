@@ -56,16 +56,19 @@ export DJANGO_ALLOWED_HOSTS=example.com
 
 ## Authentication
 
-All `/api/*` endpoints require authentication (ADR 0006):
+All `/api/*` endpoints require authentication (ADR 0008):
 
-- **API clients** (e.g. Gest_Comm_ClientFX) send HTTP Basic auth:
-  `Authorization: Basic base64(username:password)`.
+- **API clients** (e.g. Gest_Comm_ClientFX) exchange credentials once
+  for JWT tokens: `POST /api/token` with `{username, password}` returns
+  `{access, refresh}`; then send `Authorization: Bearer <access>` on
+  every request. Access tokens live 1 h; call `/api/token/refresh`
+  with the refresh token (rotated + blacklisted on use, 7 d lifetime)
+  to get a new pair.
 - **Browsers / admin** use the Django session — log in at `/admin/`.
 
 Create a user with `python manage.py createsuperuser`. Unauthenticated
-requests get `401` with a `WWW-Authenticate` challenge. Basic auth sends
-credentials on every request — only acceptable over HTTPS or a trusted
-LAN; put TLS in front before any real deployment.
+requests get `401`. TLS is still required before any non-LAN
+deployment — bearer tokens must not cross the wire in cleartext.
 
 ## API
 
@@ -74,13 +77,13 @@ retrieve/update(partial)/delete at `/<id>`:
 
 | Resource | Path | Auth |
 |---|---|---|
-| Clients | `/api/client`, `/api/client/<id>` | Basic or session |
-| Articles | `/api/article`, `/api/article/<id>` | Basic or session |
-| Devis (quotes) | `/api/devis`, `/api/devis/<id>` | Basic or session |
-| | `POST /api/devis/<id>/convertir` | Basic or session |
-| Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Basic or session |
-| Bon de livraison | `/api/bonliv`, `/api/bonliv/<id>` | Basic or session |
-| Assistant | `POST /api/assistant/ask` | Basic or session |
+| Clients | `/api/client`, `/api/client/<id>` | JWT or session |
+| Articles | `/api/article`, `/api/article/<id>` | JWT or session |
+| Devis (quotes) | `/api/devis`, `/api/devis/<id>` | JWT or session |
+| | `POST /api/devis/<id>/convertir` | JWT or session |
+| Factures (invoices) | `/api/facture`, `/api/facture/<id>` | JWT or session |
+| Bon de livraison | `/api/bonliv`, `/api/bonliv/<id>` | JWT or session |
+| Assistant | `POST /api/assistant/ask` | JWT or session |
 
 List endpoints accept query params: `?search=` (code/name/reference
 icontains) on all five resources, plus `?statut=` and `?client=<id>` on
@@ -107,5 +110,5 @@ intents.
 
 The API covers the full declared domain — clients, articles, devis and
 factures — with CRUD endpoints, an authenticated assistant, admin site,
-and Basic/session auth on `/api/*`. Remaining gap: TLS termination for
-real deployments (Basic auth is plaintext without it).
+and JWT/session auth on `/api/*`. Remaining gap: TLS termination for
+real deployments (bearer tokens are plaintext without it).
