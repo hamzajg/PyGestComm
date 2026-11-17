@@ -79,6 +79,7 @@ devis `converti` reject PUT/PATCH/DELETE with 400.
 | POST | `/api/token` | none | `{username, password}` → `{access, refresh}` |
 | POST | `/api/token/refresh` | none | `{refresh}` → rotated `{access, refresh}` |
 | POST | `/api/token/verify` | none | Validate an access token |
+| POST | `/api/token/logout` | JWT | Blacklist the refresh token (logout) |
 | * | `/admin/` | Django admin | Admin site |
 
 Client fields (`models.py`, table `client`): `idClient` (PK), `codeClient`,

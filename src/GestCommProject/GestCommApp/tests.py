@@ -712,3 +712,17 @@ class TokenApiTest(TestCase):
         response = self.client.get(
             '/api/client', HTTP_AUTHORIZATION='Bearer not-a-token')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_blacklists_refresh_token(self):
+        tokens = self._obtain()
+        response = self.client.post(
+            '/api/token/logout',
+            {'refresh': tokens['refresh']},
+            content_type='application/json',
+            HTTP_AUTHORIZATION='Bearer ' + tokens['access'])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        replay = self.client.post(
+            '/api/token/refresh',
+            {'refresh': tokens['refresh']},
+            content_type='application/json')
+        self.assertEqual(replay.status_code, status.HTTP_401_UNAUTHORIZED)
