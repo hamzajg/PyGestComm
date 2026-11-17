@@ -20,7 +20,7 @@ Verified 2026-11-13 against CI (`.github/workflows/ci.yml`) and README.
 | Install deps | `pip install -r requirements.txt` |
 | Migrate | `cd src/GestCommProject && python manage.py migrate` |
 | Run dev server | `cd src/GestCommProject && python manage.py runserver` |
-| Test | `cd src/GestCommProject && python manage.py test` (26 tests) |
+| Test | `cd src/GestCommProject && python manage.py test` (38 tests) |
 | Django checks | `python manage.py check` |
 
 Requires: env vars per README — `DJANGO_SECRET_KEY` (required unless
@@ -47,6 +47,12 @@ Every resource follows the same pattern: `GET`/`POST` on the collection
 path, `GET`/`PUT`/`PATCH`/`DELETE` on `/<id>` (the PK is the `idXxx`
 AutoField). Devis/facture payloads take a `lignes` array — on update it
 replaces the whole set; omit it to keep existing lines.
+
+List endpoints accept `?search=` (icontains on code/name/reference —
+factures also match the linked `devis.codeDevis`), and devis/facture
+lists additionally accept `?statut=` and `?client=<idClient>`.
+Terminal-state documents are read-only: factures `payee`/`annulee` and
+devis `converti` reject PUT/PATCH/DELETE with 400.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
