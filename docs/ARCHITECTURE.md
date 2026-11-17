@@ -9,8 +9,9 @@ Gest_Comm_ClientFX (desktop client, sibling repo)
         │  HTTP/JSON
         ▼
 Django 5.2 + DRF 3.16 (runserver / WSGI)
-  auth: BasicAuthentication + SessionAuthentication → IsAuthenticated
-        on every /api/* route (ADR 0006)
+  auth: JWTAuthentication + SessionAuthentication → IsAuthenticated
+        on every /api/* route; token endpoints under /api/token*
+        (ADR 0008, supersedes ADR 0006)
   ├─ GestCommProject/urls.py   routes: /api/{client,article,devis,facture}[/<id>],
   │                            /api/assistant/ask, /admin/
   └─ GestCommApp/
@@ -103,10 +104,11 @@ would map free text onto (ADR 0002). No write intents yet.
 
 `Gest_Comm_ClientFX` consumes `/api/client` (GET list, POST create) with
 the field set above; `/api/article` mirrors its Article POJO. **All
-`/api/*` routes now require authentication** — Basic auth for API
-clients, session auth for browsers (ADR 0006). The client must send
-`Authorization: Basic base64(user:pass)`; it has no auth code yet, so
-this is a breaking change to coordinate before it upgrades. Any field
+`/api/*` routes now require authentication** — JWT Bearer for API
+clients (`/api/token` + `/api/token/refresh`), session auth for
+browsers (ADR 0008). Clients obtain `{access, refresh}` once and send
+`Authorization: Bearer <access>`; refresh tokens rotate and blacklist
+on reuse. Any field
 rename, type change, or route change is a **breaking contract change**
 requiring coordination across both repos — record it as an ADR and
 update both AGENTS.md files. The devis/facture routes have no client

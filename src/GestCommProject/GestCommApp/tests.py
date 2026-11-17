@@ -529,17 +529,29 @@ class ApiAuthTest(TestCase):
             self.assertIn(response.status_code, (401, 403), url)
 
     def test_wrong_password_is_rejected(self):
-        import base64
-        token = base64.b64encode(b'api-user:wrong').decode()
-        response = self.client.get(
-            '/api/client', HTTP_AUTHORIZATION='Basic ' + token)
+        response = self.client.post(
+            '/api/token',
+            {'username': 'api-user', 'password': 'wrong'},
+            content_type='application/json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_basic_auth_grants_access(self):
+    def test_basic_auth_is_not_accepted(self):
+        # Credentials are only exchanged once at /api/token; per-request
+        # Basic auth was removed (ADR 0008).
         import base64
         token = base64.b64encode(b'api-user:test-password').decode()
         response = self.client.get(
             '/api/client', HTTP_AUTHORIZATION='Basic ' + token)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_bearer_token_grants_access(self):
+        response = self.client.post(
+            '/api/token',
+            {'username': 'api-user', 'password': 'test-password'},
+            content_type='application/json')
+        access = response.json()['access']
+        response = self.client.get(
+            '/api/client', HTTP_AUTHORIZATION='Bearer ' + access)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
@@ -642,3 +654,61 @@ class AssistantBonLivApiTest(AuthAPITestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["codeBonLiv"], "BL009")
         self.assertEqual(items[0]["statutBonLiv"], "valide")
+
+
+class TokenApiTest(TestCase):
+    """JWT auth flow: obtain pair, call the API with Bearer, refresh."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            'jwt-user', password='s3cret')
+
+    def _obtain(self):
+        response = self.client.post(
+            '/api/token',
+            {'username': 'jwt-user', 'password': 's3cret'},
+            content_type='application/json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.json()
+
+    def test_obtain_pair_and_call_api_with_bearer(self):
+        tokens = self._obtain()
+        self.assertIn('access', tokens)
+        self.assertIn('refresh', tokens)
+
+        response = self.client.get(
+            '/api/client',
+            HTTP_AUTHORIZATION='Bearer ' + tokens['access'])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_rejects_bad_credentials(self):
+        response = self.client.post(
+            '/api/token',
+            {'username': 'jwt-user', 'password': 'wrong'},
+            content_type='application/json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refresh_rotates_and_blacklists_old_token(self):
+        tokens = self._obtain()
+        response = self.client.post(
+            '/api/token/refresh',
+            {'refresh': tokens['refresh']},
+            content_type='application/json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        new_access = response.json()['access']
+        self.assertNotEqual(new_access, tokens['access'])
+
+        # Reusing the rotated refresh token must fail (blacklist).
+        replay = self.client.post(
+            '/api/token/refresh',
+            {'refresh': tokens['refresh']},
+            content_type='application/json')
+        self.assertEqual(replay.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_api_rejects_missing_and_invalid_tokens(self):
+        self.assertEqual(
+            self.client.get('/api/client').status_code,
+            status.HTTP_401_UNAUTHORIZED)
+        response = self.client.get(
+            '/api/client', HTTP_AUTHORIZATION='Bearer not-a-token')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

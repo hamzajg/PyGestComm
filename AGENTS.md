@@ -46,10 +46,10 @@ Django project under `src/GestCommProject/`:
 
 ### API contract (backend ↔ Gest_Comm_ClientFX)
 
-All `/api/*` routes require auth (ADR 0006): HTTP Basic for API clients,
+All `/api/*` routes require auth (ADR 0008): JWT Bearer for API clients
+(`POST /api/token` → `{access, refresh}`, then
+`Authorization: Bearer <access>`; refresh via `/api/token/refresh`),
 Django session for the browsable API/admin. Unauthenticated → 401.
-**Gest_Comm_ClientFX has no auth code yet** — it must send
-`Authorization: Basic ...` before it can call any endpoint.
 
 Every resource follows the same pattern: `GET`/`POST` on the collection
 path, `GET`/`PUT`/`PATCH`/`DELETE` on `/<id>` (the PK is the `idXxx`
@@ -64,18 +64,21 @@ devis `converti` reject PUT/PATCH/DELETE with 400.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET/POST | `/api/client` | Basic/session | List / create clients (ordered by `codeClient`) |
-| GET/PUT/PATCH/DELETE | `/api/client/<id>` | Basic/session | Client detail |
-| GET/POST | `/api/article` | Basic/session | List / create articles (ordered by `refArticle`) |
-| GET/PUT/PATCH/DELETE | `/api/article/<id>` | Basic/session | Article detail |
-| GET/POST | `/api/devis` | Basic/session | List / create quotes with nested `lignes` |
-| GET/PUT/PATCH/DELETE | `/api/devis/<id>` | Basic/session | Devis detail |
-| POST | `/api/devis/<id>/convertir` | Basic/session | Convert a `valide` devis → `brouillon` facture (copies client+lines, sets devis `converti`) |
-| GET/POST | `/api/facture` | Basic/session | List / create invoices with nested `lignes` |
-| GET/PUT/PATCH/DELETE | `/api/facture/<id>` | Basic/session | Facture detail |
-| GET/POST | `/api/bonliv` | Basic/session | List / create delivery notes with nested `lignes` |
-| GET/PUT/PATCH/DELETE | `/api/bonliv/<id>` | Basic/session | BonLiv detail |
-| POST | `/api/assistant/ask` | Basic/session | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all five resources) |
+| GET/POST | `/api/client` | JWT/session | List / create clients (ordered by `codeClient`) |
+| GET/PUT/PATCH/DELETE | `/api/client/<id>` | JWT/session | Client detail |
+| GET/POST | `/api/article` | JWT/session | List / create articles (ordered by `refArticle`) |
+| GET/PUT/PATCH/DELETE | `/api/article/<id>` | JWT/session | Article detail |
+| GET/POST | `/api/devis` | JWT/session | List / create quotes with nested `lignes` |
+| GET/PUT/PATCH/DELETE | `/api/devis/<id>` | JWT/session | Devis detail |
+| POST | `/api/devis/<id>/convertir` | JWT/session | Convert a `valide` devis → `brouillon` facture (copies client+lines, sets devis `converti`) |
+| GET/POST | `/api/facture` | JWT/session | List / create invoices with nested `lignes` |
+| GET/PUT/PATCH/DELETE | `/api/facture/<id>` | JWT/session | Facture detail |
+| GET/POST | `/api/bonliv` | JWT/session | List / create delivery notes with nested `lignes` |
+| GET/PUT/PATCH/DELETE | `/api/bonliv/<id>` | JWT/session | BonLiv detail |
+| POST | `/api/assistant/ask` | JWT/session | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all five resources) |
+| POST | `/api/token` | none | `{username, password}` → `{access, refresh}` |
+| POST | `/api/token/refresh` | none | `{refresh}` → rotated `{access, refresh}` |
+| POST | `/api/token/verify` | none | Validate an access token |
 | * | `/admin/` | Django admin | Admin site |
 
 Client fields (`models.py`, table `client`): `idClient` (PK), `codeClient`,
