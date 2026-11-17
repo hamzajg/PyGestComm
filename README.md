@@ -79,10 +79,11 @@ retrieve/update(partial)/delete at `/<id>`:
 | Devis (quotes) | `/api/devis`, `/api/devis/<id>` | Basic or session |
 | | `POST /api/devis/<id>/convertir` | Basic or session |
 | Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Basic or session |
+| Bon de livraison | `/api/bonliv`, `/api/bonliv/<id>` | Basic or session |
 | Assistant | `POST /api/assistant/ask` | Basic or session |
 
 List endpoints accept query params: `?search=` (code/name/reference
-icontains) on all four resources, plus `?statut=` and `?client=<id>` on
+icontains) on all five resources, plus `?statut=` and `?client=<id>` on
 devis/factures. Invoices in `payee`/`annulee` and devis in `converti`
 are read-only — writes return 400.
 

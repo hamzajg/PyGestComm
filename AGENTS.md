@@ -6,8 +6,9 @@ Guidance for AI agents (and humans) working in this repository.
 
 PyGestComm is a Django REST Framework API for a small business-management
 domain (clients, articles, quotes, invoices). It exposes CRUD endpoints
-for all four resources — `Client`, `Article`, `Devis` (quotes) and
-`Facture` (invoices) — plus a deterministic assistant — and is the
+for all five resources — `Client`, `Article`, `Devis` (quotes),
+`Facture` (invoices) and `BonLiv` (delivery notes) — plus a
+deterministic assistant — and is the
 backend for the `Gest_Comm_ClientFX` desktop client.
 Stack: Python 3.10+ (CI uses 3.13), Django 5.2 LTS, DRF 3.16, SQLite.
 
@@ -34,7 +35,8 @@ Django project under `src/GestCommProject/`:
 
 - `GestCommProject/` — `settings.py` (env-driven), `urls.py`, `wsgi.py`.
 - `GestCommApp/` — the domain app: `models.py` (`Client`, `Article`,
-  `Devis`+`LigneDevis`, `Facture`+`LigneFacture`), `serializers.py`
+  `Devis`+`LigneDevis`, `Facture`+`LigneFacture`,
+  `BonLiv`+`LigneBonLiv`), `serializers.py`
   (ModelSerializers; documents nest writable `lignes` and expose
   computed `totalHT`/`totalTVA`/`totalTTC`), `assistant.py`,
   `views.py` (list/create + retrieve/update/destroy per resource),
@@ -71,6 +73,8 @@ devis `converti` reject PUT/PATCH/DELETE with 400.
 | POST | `/api/devis/<id>/convertir` | Basic/session | Convert a `valide` devis → `brouillon` facture (copies client+lines, sets devis `converti`) |
 | GET/POST | `/api/facture` | Basic/session | List / create invoices with nested `lignes` |
 | GET/PUT/PATCH/DELETE | `/api/facture/<id>` | Basic/session | Facture detail |
+| GET/POST | `/api/bonliv` | Basic/session | List / create delivery notes with nested `lignes` |
+| GET/PUT/PATCH/DELETE | `/api/bonliv/<id>` | Basic/session | BonLiv detail |
 | POST | `/api/assistant/ask` | Basic/session | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all four resources) |
 | * | `/admin/` | Django admin | Admin site |
 
@@ -89,7 +93,15 @@ Devis fields (table `devis`): `idDevis` (PK), `codeDevis`, `dateDevis`
 (`brouillon`/`valide`/`refuse`/`converti`), `observationDevis`, `lignes`.
 
 Facture fields (table `facture`): same shape as devis plus `devis`
-(nullable FK → `idDevis`) and `statutFacture`
+(nullable FK → `idDevis`) and `statutFacture` (`brouillon`/`validee`/
+`payee`/`annulee`).
+
+BonLiv fields (table `bonliv`): same document shape (`idBonLiv`,
+`codeBonLiv`, `dateBonLiv`, client FK, `statutBonLiv`
+`brouillon`/`valide`/`livre`/`annule`, `observationBonLiv`) plus
+`LigneBonLiv` rows (`idLigneBonLiv`, `bonliv` FK, article FK,
+`designation`, `quantite`, `prixUnitaire`, `remise`, `tva`) — same
+line mechanics and computed totals as devis/facture.
 (`brouillon`/`validee`/`payee`/`annulee`).
 
 Document line fields (`ligne_devis`/`ligne_facture`): `article` (nullable

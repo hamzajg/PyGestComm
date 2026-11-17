@@ -14,7 +14,8 @@ Django 5.2 + DRF 3.16 (runserver / WSGI)
   ├─ GestCommProject/urls.py   routes: /api/{client,article,devis,facture}[/<id>],
   │                            /api/assistant/ask, /admin/
   └─ GestCommApp/
-       ├─ models.py        Client, Article, Devis+LigneDevis, Facture+LigneFacture
+       ├─ models.py        Client, Article, Devis+LigneDevis, Facture+LigneFacture,
+                 BonLiv+LigneBonLiv
        ├─ serializers.py   ModelSerializers; documents nest `lignes` and
        │                   expose computed totalHT/totalTVA/totalTTC
        ├─ assistant.py     deterministic copilot intents (count/search)
@@ -41,6 +42,10 @@ README always promised:
   `client` FK (PROTECT), `statutDevis` (brouillon/valide/refuse/converti),
   `observationDevis`, plus `LigneDevis` rows. A `valide` devis converts
   to a facture via `POST /api/devis/<id>/convertir`.
+- **BonLiv** — delivery note: same document shape (`codeBonLiv`,
+  `dateBonLiv`, `statutBonLiv` brouillon/valide/livre/annule,
+  `observationBonLiv`) plus `LigneBonLiv` rows; `livre`/`annule` are
+  terminal states.
 - **Facture** — invoice: same shape plus `statutFacture`
   (brouillon/validee/payee/annulee) and an optional `devis` FK (PROTECT)
   recording which quote it came from, plus `LigneFacture` rows.

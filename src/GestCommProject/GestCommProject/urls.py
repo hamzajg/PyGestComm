@@ -27,6 +27,8 @@ urlpatterns = [
     path('api/devis/<int:pk>/convertir', views.DevisConvertir.as_view()),
     path('api/facture', views.FactureList.as_view()),
     path('api/facture/<int:pk>', views.FactureDetail.as_view()),
+    path('api/bonliv', views.BonLivList.as_view()),
+    path('api/bonliv/<int:pk>', views.BonLivDetail.as_view()),
     path('api/assistant/ask', views.AssistantAsk.as_view()),
     path('admin/', admin.site.urls),
 ]
