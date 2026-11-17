@@ -110,5 +110,5 @@ intents.
 
 The API covers the full declared domain — clients, articles, devis and
 factures — with CRUD endpoints, an authenticated assistant, admin site,
-and JWT/session auth on `/api/*`. Remaining gap: TLS termination for
-real deployments (bearer tokens are plaintext without it).
+and JWT/session auth on `/api/*`. TLS deployment guide: `docs/DEPLOYMENT.md`
+(+ `deploy/Caddyfile`) — set `DJANGO_SECURE_SSL=1` behind a TLS proxy.

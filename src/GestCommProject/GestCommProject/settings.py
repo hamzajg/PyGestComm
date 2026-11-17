@@ -52,6 +52,22 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# TLS termination (ADR 0009, docs/DEPLOYMENT.md): set DJANGO_SECURE_SSL=1
+# when a TLS-terminating reverse proxy (Caddy/nginx) fronts Django. The
+# proxy sets X-Forwarded-Proto; Django trusts it, redirects http→https,
+# marks cookies Secure, and sends HSTS. Off by default so dev/LAN flows
+# and the test suite are unaffected.
+SECURE_SSL = env_bool('DJANGO_SECURE_SSL', False)
+SECURE_PROXY_SSL_HEADER = (
+    ('HTTP_X_FORWARDED_PROTO', 'https') if SECURE_SSL else None)
+SECURE_SSL_REDIRECT = SECURE_SSL
+SESSION_COOKIE_SECURE = SECURE_SSL
+CSRF_COOKIE_SECURE = SECURE_SSL
+SECURE_HSTS_SECONDS = 31536000 if SECURE_SSL else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_SSL
+SECURE_HSTS_PRELOAD = SECURE_SSL
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 
 # Application definition
 
