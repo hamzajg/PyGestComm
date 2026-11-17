@@ -403,3 +403,88 @@ class DevisConversionApiTest(APITestCase):
     def test_unknown_devis_is_404(self):
         response = self.client.post(self.url(999), {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ListFilterApiTest(APITestCase):
+    def setUp(self):
+        self.client_obj = Client.objects.create(**CLIENT)
+        other = Client.objects.create(**{
+            **CLIENT, "codeClient": "C002",
+            "nomPrenomClient": "Grace Hopper"})
+        Article.objects.create(**ARTICLE)
+        Article.objects.create(**{**ARTICLE, "refArticle": "ART-002",
+                                  "descArticle": "Gadget"})
+        Devis.objects.create(**{**DEVIS, "client": self.client_obj})
+        Devis.objects.create(**{
+            **DEVIS, "codeDevis": "D002", "client": other,
+            "statutDevis": "valide"})
+        Facture.objects.create(**{**FACTURE, "client": self.client_obj})
+
+    def test_client_search_filter(self):
+        response = self.client.get("/api/client?search=hopper")
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]["codeClient"], "C002")
+
+    def test_article_search_filter(self):
+        response = self.client.get("/api/article?search=gadget")
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]["refArticle"], "ART-002")
+
+    def test_devis_statut_and_client_filters(self):
+        response = self.client.get("/api/devis?statut=valide")
+        self.assertEqual([d["codeDevis"] for d in response.json()], ["D002"])
+
+        response = self.client.get(
+            "/api/devis?client=%d" % self.client_obj.idClient)
+        self.assertEqual([d["codeDevis"] for d in response.json()], ["D001"])
+
+    def test_facture_search_filter_includes_devis_code(self):
+        devis = Devis.objects.get(codeDevis="D002")
+        Facture.objects.create(**{
+            **FACTURE, "codeFacture": "F002", "client": devis.client,
+            "devis": devis})
+
+        response = self.client.get("/api/facture?search=D002")
+        self.assertEqual(
+            [f["codeFacture"] for f in response.json()], ["F002"])
+
+
+class LockedDocumentApiTest(APITestCase):
+    def setUp(self):
+        self.client_obj = Client.objects.create(**CLIENT)
+        self.facture = Facture.objects.create(
+            **{**FACTURE, "client": self.client_obj,
+               "statutFacture": "payee"})
+        self.devis = Devis.objects.create(
+            **{**DEVIS, "codeDevis": "D009", "client": self.client_obj,
+               "statutDevis": "converti"})
+
+    def test_payee_facture_rejects_patch_and_delete(self):
+        response = self.client.patch(
+            "/api/facture/%d" % self.facture.idFacture,
+            {"observationFacture": "edit"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.delete(
+            "/api/facture/%d" % self.facture.idFacture)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Facture.objects.count(), 1)
+
+    def test_payee_facture_still_retrieves(self):
+        response = self.client.get(
+            "/api/facture/%d" % self.facture.idFacture)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_converti_devis_rejects_patch(self):
+        response = self.client.patch(
+            "/api/devis/%d" % self.devis.idDevis,
+            {"observationDevis": "edit"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_brouillon_facture_still_updates(self):
+        self.facture.statutFacture = "brouillon"
+        self.facture.save()
+        response = self.client.patch(
+            "/api/facture/%d" % self.facture.idFacture,
+            {"observationFacture": "ok"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

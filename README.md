@@ -68,6 +68,11 @@ retrieve/update(partial)/delete at `/<id>`:
 | Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Same line shape; optional `devis` link |
 | Assistant | `POST /api/assistant/ask` | Deterministic copilot: count/search over all four resources |
 
+List endpoints accept query params: `?search=` (code/name/reference
+icontains) on all four resources, plus `?statut=` and `?client=<id>` on
+devis/factures. Invoices in `payee`/`annulee` and devis in `converti`
+are read-only — writes return 400.
+
 Documents (`devis`, `facture`) accept a `lignes` array on create and on
 update (update replaces the whole set). A line needs either `article`
 (id — designation, price, discount and VAT default from it) or explicit
@@ -79,8 +84,9 @@ update (update replaces the whole set). A line needs either `article`
 python manage.py test
 ```
 
-26 tests covering the client/article endpoints, devis/facture creation
-with nested lines and totals, status updates, and the assistant intents.
+38 tests covering the client/article endpoints, devis/facture creation
+with nested lines and totals, status updates, conversion, list filters,
+terminal-state locks, and the assistant intents.
 
 ## Status
 

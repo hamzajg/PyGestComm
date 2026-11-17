@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import render
 from GestCommApp.models import Article, Client, Devis, Facture, LigneFacture
@@ -12,9 +13,26 @@ from rest_framework.views import APIView
 # Create your views here.
 
 
+def _search_param(request, *fields):
+    term = request.query_params.get('search', '').strip()
+    if not term:
+        return None
+    query = Q()
+    for field in fields:
+        query |= Q(**{field + '__icontains': term})
+    return query
+
+
 class ClientList(generics.ListCreateAPIView):
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        query = _search_param(
+            self.request, 'codeClient', 'nomPrenomClient',
+            'matFiscalClient')
+        return qs.filter(query) if query else qs
 
 
 class ClientDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -26,30 +44,93 @@ class ArticleList(generics.ListCreateAPIView):
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        query = _search_param(self.request, 'refArticle', 'descArticle')
+        return qs.filter(query) if query else qs
+
 
 class ArticleDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
 
 
+def _document_queryset(request, model):
+    qs = model.objects.prefetch_related('lignes__article')
+    suffix = model.__name__.capitalize()  # Devis → statutDevis/codeDevis
+    statut = request.query_params.get('statut')
+    if statut:
+        qs = qs.filter(**{'statut' + suffix: statut})
+    client_id = request.query_params.get('client')
+    if client_id:
+        qs = qs.filter(client_id=client_id)
+    term = request.query_params.get('search', '').strip()
+    if term:
+        query = (
+            Q(**{'code' + suffix + '__icontains': term})
+            | Q(client__codeClient__icontains=term)
+            | Q(client__nomPrenomClient__icontains=term))
+        if model is Facture:
+            query |= Q(devis__codeDevis__icontains=term)
+        qs = qs.filter(query)
+    return qs
+
+
 class DevisList(generics.ListCreateAPIView):
-    queryset = Devis.objects.prefetch_related('lignes__article')
     serializer_class = DevisSerializer
+
+    def get_queryset(self):
+        return _document_queryset(self.request, Devis)
+
+
+class FactureList(generics.ListCreateAPIView):
+    serializer_class = FactureSerializer
+
+    def get_queryset(self):
+        return _document_queryset(self.request, Facture)
+
+
+def _locked_detail(view, request, *args, **kwargs):
+    """Reject writes on terminal-state documents."""
+    instance = view.get_object()
+    locked_statuts = {
+        'Facture': (Facture.STATUT_PAYEE, Facture.STATUT_ANNULEE),
+        'Devis': (Devis.STATUT_CONVERTI,),
+    }[type(instance).__name__]
+    statut_field = 'statut' + type(instance).__name__.capitalize()
+    if getattr(instance, statut_field) in locked_statuts:
+        return Response(
+            {"detail": f"A '{getattr(instance, statut_field)}' "
+                       f"{type(instance).__name__.lower()} cannot be "
+                       "modified or deleted."},
+            status=status.HTTP_400_BAD_REQUEST)
+    return None
 
 
 class DevisDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Devis.objects.prefetch_related('lignes__article')
     serializer_class = DevisSerializer
 
+    def update(self, request, *args, **kwargs):
+        blocked = _locked_detail(self, request, *args, **kwargs)
+        return blocked or super().update(request, *args, **kwargs)
 
-class FactureList(generics.ListCreateAPIView):
-    queryset = Facture.objects.prefetch_related('lignes__article')
-    serializer_class = FactureSerializer
+    def destroy(self, request, *args, **kwargs):
+        blocked = _locked_detail(self, request, *args, **kwargs)
+        return blocked or super().destroy(request, *args, **kwargs)
 
 
 class FactureDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Facture.objects.prefetch_related('lignes__article')
     serializer_class = FactureSerializer
+
+    def update(self, request, *args, **kwargs):
+        blocked = _locked_detail(self, request, *args, **kwargs)
+        return blocked or super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        blocked = _locked_detail(self, request, *args, **kwargs)
+        return blocked or super().destroy(request, *args, **kwargs)
 
 
 class DevisConvertir(APIView):

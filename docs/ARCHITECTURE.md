@@ -62,6 +62,12 @@ providing `lignes` replaces the whole set inside a transaction — omit the
 key to leave lines untouched. A line must resolve a `designation` and a
 unit price, either explicitly or from its linked `article`.
 
+List endpoints filter via query params (`?search=`, plus `?statut=` and
+`?client=` on documents) implemented in `get_queryset` — no django-filter
+dependency. Terminal-state documents (facture `payee`/`annulee`, devis
+`converti`) are read-only: writes return 400 — enforced in the detail
+views, not the serializer, so it applies to PUT/PATCH/DELETE alike.
+
 ## Data
 
 - Tables: `client`, `article`, `devis`, `ligne_devis`, `facture`,
