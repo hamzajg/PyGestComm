@@ -12,7 +12,7 @@ write it.
 
 ## Tech stack
 
-- Python 3.10+ (CI uses 3.12)
+- Python 3.10+ (CI uses 3.13)
 - Django 5.2 (LTS) and Django REST Framework 3.16
 
 ## Project layout
@@ -54,17 +54,36 @@ export DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsa
 export DJANGO_ALLOWED_HOSTS=example.com
 ```
 
+## API
+
+All resources support list/create at the collection path and
+retrieve/update(partial)/delete at `/<id>`:
+
+| Resource | Path | Notes |
+|---|---|---|
+| Clients | `/api/client`, `/api/client/<id>` | Legacy field names (`codeClient`, …) |
+| Articles | `/api/article`, `/api/article/<id>` | Sale/purchase prices, discounts, VAT |
+| Devis (quotes) | `/api/devis`, `/api/devis/<id>` | Nested `lignes`, computed HT/TVA/TTC totals |
+| Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Same line shape; optional `devis` link |
+| Assistant | `POST /api/assistant/ask` | Deterministic copilot: count/search over all four resources |
+
+Documents (`devis`, `facture`) accept a `lignes` array on create and on
+update (update replaces the whole set). A line needs either `article`
+(id — designation, price, discount and VAT default from it) or explicit
+`designation` + `prixUnitaire`.
+
 ## Tests
 
 ```bash
 python manage.py test
 ```
 
-5 tests: the client model's string form, and the client endpoint listing every
-field in code order, creating a client, and rejecting one without a code.
+26 tests covering the client/article endpoints, devis/facture creation
+with nested lines and totals, status updates, and the assistant intents.
 
 ## Status
 
-The project has been moved to a supported Django and DRF line, and the
-dependency list now contains only what the code imports. The API still covers
-a single client endpoint, and the model has no update/delete route yet.
+The API covers the full declared domain — clients, articles, devis and
+factures — with CRUD endpoints, an admin site, and a deterministic
+assistant. Still no authentication on `/api/*` (see ADR 0001); that's the
+main gap before any network exposure.
