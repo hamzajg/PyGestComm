@@ -64,6 +64,7 @@ retrieve/update(partial)/delete at `/<id>`:
 | Clients | `/api/client`, `/api/client/<id>` | Legacy field names (`codeClient`, …) |
 | Articles | `/api/article`, `/api/article/<id>` | Sale/purchase prices, discounts, VAT |
 | Devis (quotes) | `/api/devis`, `/api/devis/<id>` | Nested `lignes`, computed HT/TVA/TTC totals |
+| | `POST /api/devis/<id>/convertir` | Convert a `valide` devis into a `brouillon` facture |
 | Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Same line shape; optional `devis` link |
 | Assistant | `POST /api/assistant/ask` | Deterministic copilot: count/search over all four resources |
 

@@ -55,10 +55,12 @@ class Devis(models.Model):
     STATUT_BROUILLON = 'brouillon'
     STATUT_VALIDE = 'valide'
     STATUT_REFUSE = 'refuse'
+    STATUT_CONVERTI = 'converti'
     STATUT_CHOICES = [
         (STATUT_BROUILLON, 'Brouillon'),
         (STATUT_VALIDE, 'Validé'),
         (STATUT_REFUSE, 'Refusé'),
+        (STATUT_CONVERTI, 'Converti'),
     ]
 
     idDevis = models.AutoField(primary_key=True)
