@@ -1,0 +1,13 @@
+# Caddy reverse proxy for PyGestComm — automatic HTTPS.
+#
+# Install Caddy (https://caddyserver.com), place this file, then:
+#   caddy run --config Caddyfile        # or: caddy start
+#
+# Replace gestcomm.example.com with your domain (a DNS A record pointing
+# at this host is required for automatic certificates). For LAN-only use
+# without a domain, use `tls internal` instead and install Caddy's local
+# CA on clients.
+
+gestcomm.example.com {
+	reverse_proxy 127.0.0.1:8000
+}
