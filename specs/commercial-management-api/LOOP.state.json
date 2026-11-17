@@ -1,0 +1,34 @@
+{
+  "feature": "commercial-management-api",
+  "status": "done",
+  "iterations": 1,
+  "updated": "2026-11-17T20:59:35Z",
+  "waves": {
+    "1": {
+      "status": "done",
+      "branch": "feat/commercial-management-api-w1",
+      "pr": "\u2014",
+      "evidence": "retroactive spec record; manage.py test 52/52 OK; manage.py check clean; all routes verified live earlier (JWT flow, con",
+      "updated": "2026-11-17T20:59:27Z"
+    }
+  },
+  "gates": {
+    "G1": {
+      "status": "met",
+      "evidence": "specs/commercial-management-api/SPEC.md \u2014 scope in/out + 4 ACs frozen",
+      "updated": "2026-11-17T20:58:40Z"
+    },
+    "G2": {
+      "status": "met",
+      "evidence": "python manage.py test -> Ran 52 tests OK; manage.py check -> 0 issues",
+      "updated": "2026-11-17T20:59:30Z"
+    }
+  },
+  "events": [
+    "2026-11-17T20:58:40Z gate G1 met: specs/commercial-management-api/SPEC.md \u2014 scope in/out + 4 ACs frozen",
+    "2026-11-17T20:58:44Z start wave 1 on feat/commercial-management-api-w1",
+    "2026-11-17T20:59:27Z complete wave 1: retroactive spec record; manage.py test 52/52 OK; manage.py check clean; all routes verified live earlier (JWT flow, con",
+    "2026-11-17T20:59:30Z gate G2 met: python manage.py test -> Ran 52 tests OK; manage.py check -> 0 issues",
+    "2026-11-17T20:59:35Z feature validated and shipped"
+  ]
+}
