@@ -54,19 +54,32 @@ export DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsa
 export DJANGO_ALLOWED_HOSTS=example.com
 ```
 
+## Authentication
+
+All `/api/*` endpoints require authentication (ADR 0006):
+
+- **API clients** (e.g. Gest_Comm_ClientFX) send HTTP Basic auth:
+  `Authorization: Basic base64(username:password)`.
+- **Browsers / admin** use the Django session — log in at `/admin/`.
+
+Create a user with `python manage.py createsuperuser`. Unauthenticated
+requests get `401` with a `WWW-Authenticate` challenge. Basic auth sends
+credentials on every request — only acceptable over HTTPS or a trusted
+LAN; put TLS in front before any real deployment.
+
 ## API
 
 All resources support list/create at the collection path and
 retrieve/update(partial)/delete at `/<id>`:
 
-| Resource | Path | Notes |
+| Resource | Path | Auth |
 |---|---|---|
-| Clients | `/api/client`, `/api/client/<id>` | Legacy field names (`codeClient`, …) |
-| Articles | `/api/article`, `/api/article/<id>` | Sale/purchase prices, discounts, VAT |
-| Devis (quotes) | `/api/devis`, `/api/devis/<id>` | Nested `lignes`, computed HT/TVA/TTC totals |
-| | `POST /api/devis/<id>/convertir` | Convert a `valide` devis into a `brouillon` facture |
-| Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Same line shape; optional `devis` link |
-| Assistant | `POST /api/assistant/ask` | Deterministic copilot: count/search over all four resources |
+| Clients | `/api/client`, `/api/client/<id>` | Basic or session |
+| Articles | `/api/article`, `/api/article/<id>` | Basic or session |
+| Devis (quotes) | `/api/devis`, `/api/devis/<id>` | Basic or session |
+| | `POST /api/devis/<id>/convertir` | Basic or session |
+| Factures (invoices) | `/api/facture`, `/api/facture/<id>` | Basic or session |
+| Assistant | `POST /api/assistant/ask` | Basic or session |
 
 List endpoints accept query params: `?search=` (code/name/reference
 icontains) on all four resources, plus `?statut=` and `?client=<id>` on
@@ -84,13 +97,14 @@ update (update replaces the whole set). A line needs either `article`
 python manage.py test
 ```
 
-38 tests covering the client/article endpoints, devis/facture creation
-with nested lines and totals, status updates, conversion, list filters,
-terminal-state locks, and the assistant intents.
+41 tests covering auth enforcement, the client/article endpoints,
+devis/facture creation with nested lines and totals, status updates,
+conversion, list filters, terminal-state locks, and the assistant
+intents.
 
 ## Status
 
 The API covers the full declared domain — clients, articles, devis and
-factures — with CRUD endpoints, an admin site, and a deterministic
-assistant. Still no authentication on `/api/*` (see ADR 0001); that's the
-main gap before any network exposure.
+factures — with CRUD endpoints, an authenticated assistant, admin site,
+and Basic/session auth on `/api/*`. Remaining gap: TLS termination for
+real deployments (Basic auth is plaintext without it).

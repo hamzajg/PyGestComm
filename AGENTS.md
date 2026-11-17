@@ -20,12 +20,13 @@ Verified 2026-11-13 against CI (`.github/workflows/ci.yml`) and README.
 | Install deps | `pip install -r requirements.txt` |
 | Migrate | `cd src/GestCommProject && python manage.py migrate` |
 | Run dev server | `cd src/GestCommProject && python manage.py runserver` |
-| Test | `cd src/GestCommProject && python manage.py test` (38 tests) |
+| Test | `cd src/GestCommProject && python manage.py test` (41 tests) |
 | Django checks | `python manage.py check` |
 
 Requires: env vars per README — `DJANGO_SECRET_KEY` (required unless
 `DJANGO_DEBUG` on), `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`. Defaults work for
 local dev. DB is `src/GestCommProject/db.sqlite3` (gitignored dev DB).
+Create API users with `python manage.py createsuperuser`.
 
 ## Architecture
 
@@ -43,6 +44,11 @@ Django project under `src/GestCommProject/`:
 
 ### API contract (backend ↔ Gest_Comm_ClientFX)
 
+All `/api/*` routes require auth (ADR 0006): HTTP Basic for API clients,
+Django session for the browsable API/admin. Unauthenticated → 401.
+**Gest_Comm_ClientFX has no auth code yet** — it must send
+`Authorization: Basic ...` before it can call any endpoint.
+
 Every resource follows the same pattern: `GET`/`POST` on the collection
 path, `GET`/`PUT`/`PATCH`/`DELETE` on `/<id>` (the PK is the `idXxx`
 AutoField). Devis/facture payloads take a `lignes` array — on update it
@@ -56,16 +62,16 @@ devis `converti` reject PUT/PATCH/DELETE with 400.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET/POST | `/api/client` | none | List / create clients (ordered by `codeClient`) |
-| GET/PUT/PATCH/DELETE | `/api/client/<id>` | none | Client detail |
-| GET/POST | `/api/article` | none | List / create articles (ordered by `refArticle`) |
-| GET/PUT/PATCH/DELETE | `/api/article/<id>` | none | Article detail |
-| GET/POST | `/api/devis` | none | List / create quotes with nested `lignes` |
-| GET/PUT/PATCH/DELETE | `/api/devis/<id>` | none | Devis detail |
-| POST | `/api/devis/<id>/convertir` | none | Convert a `valide` devis → `brouillon` facture (copies client+lines, sets devis `converti`) |
-| GET/POST | `/api/facture` | none | List / create invoices with nested `lignes` |
-| GET/PUT/PATCH/DELETE | `/api/facture/<id>` | none | Facture detail |
-| POST | `/api/assistant/ask` | none | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all four resources) |
+| GET/POST | `/api/client` | Basic/session | List / create clients (ordered by `codeClient`) |
+| GET/PUT/PATCH/DELETE | `/api/client/<id>` | Basic/session | Client detail |
+| GET/POST | `/api/article` | Basic/session | List / create articles (ordered by `refArticle`) |
+| GET/PUT/PATCH/DELETE | `/api/article/<id>` | Basic/session | Article detail |
+| GET/POST | `/api/devis` | Basic/session | List / create quotes with nested `lignes` |
+| GET/PUT/PATCH/DELETE | `/api/devis/<id>` | Basic/session | Devis detail |
+| POST | `/api/devis/<id>/convertir` | Basic/session | Convert a `valide` devis → `brouillon` facture (copies client+lines, sets devis `converti`) |
+| GET/POST | `/api/facture` | Basic/session | List / create invoices with nested `lignes` |
+| GET/PUT/PATCH/DELETE | `/api/facture/<id>` | Basic/session | Facture detail |
+| POST | `/api/assistant/ask` | Basic/session | `{question}` → `{intent, answer, data}` — deterministic read-only copilot (count/search intents over all four resources) |
 | * | `/admin/` | Django admin | Admin site |
 
 Client fields (`models.py`, table `client`): `idClient` (PK), `codeClient`,

@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -15,6 +16,18 @@ CLIENT = {
 }
 
 
+
+class AuthAPITestCase(APITestCase):
+    """Every /api/* endpoint now requires authentication (ADR 0006);
+    tests authenticate as a regular user."""
+
+    def setUp(self):
+        # No password: force_authenticate ignores it, and skipping the
+        # hash keeps the suite fast (PBKDF2 ~1s per create_user).
+        self.user = User.objects.create_user('api-user')
+        self.client.force_authenticate(user=self.user)
+
+
 class ClientModelTests(TestCase):
     def test_create_client(self):
         client = Client.objects.create(**CLIENT)
@@ -22,7 +35,7 @@ class ClientModelTests(TestCase):
         self.assertEqual(str(client), "%d: C001" % client.idClient)
 
 
-class ClientApiTest(APITestCase):
+class ClientApiTest(AuthAPITestCase):
     url = "/api/client"
 
     def test_lists_every_field_of_each_client(self):
@@ -60,10 +73,11 @@ class ClientApiTest(APITestCase):
         self.assertIn("codeClient", response.json())
 
 
-class AssistantApiTest(APITestCase):
+class AssistantApiTest(AuthAPITestCase):
     url = "/api/assistant/ask"
 
     def setUp(self):
+        super().setUp()
         Client.objects.create(**CLIENT)
         Client.objects.create(**{**CLIENT,
                                  "codeClient": "C002",
@@ -138,7 +152,7 @@ FACTURE = {
 }
 
 
-class ArticleApiTest(APITestCase):
+class ArticleApiTest(AuthAPITestCase):
     url = "/api/article"
 
     def test_creates_and_retrieves_an_article(self):
@@ -164,10 +178,11 @@ class ArticleApiTest(APITestCase):
         self.assertEqual(Article.objects.count(), 0)
 
 
-class ClientDetailApiTest(APITestCase):
+class ClientDetailApiTest(AuthAPITestCase):
     url = "/api/client"
 
     def setUp(self):
+        super().setUp()
         Client.objects.create(**CLIENT)
 
     def test_retrieves_updates_and_deletes_a_client(self):
@@ -186,10 +201,11 @@ class ClientDetailApiTest(APITestCase):
         self.assertEqual(Client.objects.count(), 0)
 
 
-class DevisApiTest(APITestCase):
+class DevisApiTest(AuthAPITestCase):
     url = "/api/devis"
 
     def setUp(self):
+        super().setUp()
         self.client_obj = Client.objects.create(**CLIENT)
         self.article = Article.objects.create(**{
             **ARTICLE,
@@ -269,10 +285,11 @@ class DevisApiTest(APITestCase):
         self.assertEqual(len(body["lignes"]), 1)
         self.assertEqual(body["lignes"][0]["designation"], "Autre")
 
-class FactureApiTest(APITestCase):
+class FactureApiTest(AuthAPITestCase):
     url = "/api/facture"
 
     def setUp(self):
+        super().setUp()
         self.client_obj = Client.objects.create(**CLIENT)
         self.article = Article.objects.create(**ARTICLE)
         self.devis = Devis.objects.create(
@@ -305,10 +322,11 @@ class FactureApiTest(APITestCase):
         self.assertEqual(response.json()["statutFacture"], "payee")
 
 
-class AssistantDomainApiTest(APITestCase):
+class AssistantDomainApiTest(AuthAPITestCase):
     url = "/api/assistant/ask"
 
     def setUp(self):
+        super().setUp()
         client_obj = Client.objects.create(**CLIENT)
         article = Article.objects.create(**ARTICLE)
         devis = Devis.objects.create(**{**DEVIS, "client": client_obj})
@@ -349,8 +367,9 @@ class AssistantDomainApiTest(APITestCase):
         self.assertEqual(body["data"]["factures"][0]["codeFacture"], "F001")
 
 
-class DevisConversionApiTest(APITestCase):
+class DevisConversionApiTest(AuthAPITestCase):
     def setUp(self):
+        super().setUp()
         self.client_obj = Client.objects.create(**CLIENT)
         self.article = Article.objects.create(**ARTICLE)
         self.devis = Devis.objects.create(
@@ -405,8 +424,9 @@ class DevisConversionApiTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
-class ListFilterApiTest(APITestCase):
+class ListFilterApiTest(AuthAPITestCase):
     def setUp(self):
+        super().setUp()
         self.client_obj = Client.objects.create(**CLIENT)
         other = Client.objects.create(**{
             **CLIENT, "codeClient": "C002",
@@ -449,8 +469,9 @@ class ListFilterApiTest(APITestCase):
             [f["codeFacture"] for f in response.json()], ["F002"])
 
 
-class LockedDocumentApiTest(APITestCase):
+class LockedDocumentApiTest(AuthAPITestCase):
     def setUp(self):
+        super().setUp()
         self.client_obj = Client.objects.create(**CLIENT)
         self.facture = Facture.objects.create(
             **{**FACTURE, "client": self.client_obj,
@@ -487,4 +508,36 @@ class LockedDocumentApiTest(APITestCase):
         response = self.client.patch(
             "/api/facture/%d" % self.facture.idFacture,
             {"observationFacture": "ok"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class ApiAuthTest(TestCase):
+    """Auth is enforced at the DRF layer — these use a plain Client (no
+    force_authenticate) to exercise real credential checks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            'api-user', password='test-password')
+
+    def test_unauthenticated_requests_are_rejected(self):
+        for url in ('/api/client', '/api/article', '/api/devis',
+                    '/api/facture', '/api/assistant/ask'):
+            method = self.client.post if url.endswith('ask') else self.client.get
+            response = method(url, {}, format='json') if url.endswith('ask') \
+                else method(url)
+            self.assertIn(response.status_code, (401, 403), url)
+
+    def test_wrong_password_is_rejected(self):
+        import base64
+        token = base64.b64encode(b'api-user:wrong').decode()
+        response = self.client.get(
+            '/api/client', HTTP_AUTHORIZATION='Basic ' + token)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_basic_auth_grants_access(self):
+        import base64
+        token = base64.b64encode(b'api-user:test-password').decode()
+        response = self.client.get(
+            '/api/client', HTTP_AUTHORIZATION='Basic ' + token)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
