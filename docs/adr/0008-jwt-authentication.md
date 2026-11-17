@@ -36,8 +36,8 @@ with a rotating refresh token (`djangorestframework-simplejwt`).
 - Access tokens are bearer tokens: anyone holding one can call the API
   until expiry — TLS becomes more important, not less (ADR still
   requires it before non-LAN deployment).
-- Logout/revocation = blacklist the refresh token (no endpoint yet;
-  add `TokenBlacklistView` if needed).
+- `POST /api/token/logout` (`TokenBlacklistView`, auth required)
+  blacklists the presented refresh token — real logout/revocation.
 - Breaking change for any Basic-auth client — only `Gest_Comm_ClientFX`
   consumes this API and is updated in the same change set.
 - New dependency `djangorestframework-simplejwt` (PyJWT under the
