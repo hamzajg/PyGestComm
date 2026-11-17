@@ -726,3 +726,58 @@ class TokenApiTest(TestCase):
             {'refresh': tokens['refresh']},
             content_type='application/json')
         self.assertEqual(replay.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class DocumentNumberingTest(AuthAPITestCase):
+    """Blank document codes get sequential PREFIX-NNNN numbers."""
+
+    def setUp(self):
+        super().setUp()
+        self.client_obj = Client.objects.create(**CLIENT)
+
+    def _post(self, url, payload):
+        return self.client.post(url, payload, format='json')
+
+    def test_devis_auto_number_increments(self):
+        for expected in ('DEV-0001', 'DEV-0002'):
+            r = self._post('/api/devis', {
+                'client': self.client_obj.idClient,
+                'dateDevis': '2026-11-17'})
+            self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(r.json()['codeDevis'], expected)
+
+    def test_explicit_code_is_preserved(self):
+        r = self._post('/api/devis', {
+            'client': self.client_obj.idClient,
+            'codeDevis': 'J-DEV-99999',
+            'dateDevis': '2026-11-17'})
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.json()['codeDevis'], 'J-DEV-99999')
+        # Non-prefixed codes don't disturb the DEV- sequence.
+        r = self._post('/api/devis', {
+            'client': self.client_obj.idClient,
+            'dateDevis': '2026-11-17'})
+        self.assertEqual(r.json()['codeDevis'], 'DEV-0001')
+
+    def test_sequences_are_per_type(self):
+        self._post('/api/devis', {
+            'client': self.client_obj.idClient,
+            'dateDevis': '2026-11-17'})
+        cases = (
+            ('/api/facture', 'dateFacture', 'codeFacture', 'FAC-0001'),
+            ('/api/bonliv', 'dateBonLiv', 'codeBonLiv', 'BL-0001'))
+        for url, date_field, code_field, expected in cases:
+            r = self._post(url, {
+                'client': self.client_obj.idClient,
+                date_field: '2026-11-17'})
+            self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.json())
+            self.assertEqual(r.json()[code_field], expected)
+
+    def test_numbering_continues_after_high_code(self):
+        Devis.objects.create(
+            codeDevis='DEV-0042', client=self.client_obj,
+            dateDevis='2026-11-17')
+        r = self._post('/api/devis', {
+            'client': self.client_obj.idClient,
+            'dateDevis': '2026-11-17'})
+        self.assertEqual(r.json()['codeDevis'], 'DEV-0043')

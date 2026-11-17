@@ -1,0 +1,26 @@
+{
+  "feature": "document-numbering",
+  "status": "running",
+  "iterations": 0,
+  "updated": "2026-11-17T21:04:50Z",
+  "waves": {
+    "1": {
+      "status": "in-progress",
+      "branch": "feat/document-numbering-w1",
+      "pr": "\u2014",
+      "evidence": "\u2014",
+      "updated": "2026-11-17T21:04:50Z"
+    }
+  },
+  "gates": {
+    "G1": {
+      "status": "met",
+      "evidence": "specs/document-numbering/SPEC.md frozen: DEV-/FAC-/BL- prefixes, create-only, no uniqueness",
+      "updated": "2026-11-17T21:04:50Z"
+    }
+  },
+  "events": [
+    "2026-11-17T21:04:50Z gate G1 met: specs/document-numbering/SPEC.md frozen: DEV-/FAC-/BL- prefixes, create-only, no uniqueness",
+    "2026-11-17T21:04:50Z start wave 1 on feat/document-numbering-w1"
+  ]
+}
