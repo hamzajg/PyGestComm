@@ -1,13 +1,16 @@
-"""Deterministic assistant intents over the Client resource.
+"""Deterministic assistant intents over the domain resources.
 
 This is the copilot's *tool surface*, not an LLM: `answer()` maps a small
 set of intents onto ORM queries and returns structured results. A future
 LLM front-end (the orca/al-minhej pattern) would translate free text into
 these same intents — the contract stays stable either way.
 
+Resources: clients, articles, devis (quotes), factures (invoices).
+
 Intents today (KISS — extend only when a real caller needs it):
-  - count        "how many clients", "combien de clients"
-  - search       "find client <term>", "client <term>", "<term>" alone
+  - count        "how many clients/articles/devis/factures"
+  - search       "find <resource> <term>", "<resource> <term>", or a
+                 bare term (searched against clients, then articles)
   - help         anything else → describes what it can do
 """
 
@@ -15,16 +18,44 @@ import re
 
 from django.db.models import Q
 
-from GestCommApp.models import Client
+from GestCommApp.models import Article, Client, Devis, Facture
 
-_INTENT_PATTERNS = [
-    ("count", re.compile(
-        r"(how many|combien|nombre de|count|total).*(client|clientèle)?",
-        re.IGNORECASE)),
-    ("search", re.compile(
-        r"(find|search|lookup|show|get|list|trouver|chercher|afficher|client)\s*(.*)",
-        re.IGNORECASE)),
-]
+_COUNT_RE = re.compile(
+    r"(how many|combien|nombre de|count|total)\s*(.*)", re.IGNORECASE)
+_SEARCH_RE = re.compile(
+    r"(find|search|lookup|show|get|list|trouver|chercher|afficher)\s*(.*)",
+    re.IGNORECASE)
+
+_RESOURCES = {
+    'client': Client,
+    'article': Article,
+    'devis': Devis,
+    'facture': Facture,
+}
+
+_PLURALS = {
+    'client': 'clients', 'article': 'articles',
+    'devis': 'devis', 'facture': 'factures',
+}
+
+# Plural/French aliases → canonical resource key.
+_ALIASES = {
+    'client': 'client', 'clients': 'client',
+    'clientèle': 'client', 'clientele': 'client',
+    'article': 'article', 'articles': 'article',
+    'produit': 'article', 'produits': 'article',
+    'devis': 'devis', 'quote': 'devis', 'quotes': 'devis',
+    'proforma': 'devis',
+    'facture': 'facture', 'factures': 'facture',
+    'invoice': 'facture', 'invoices': 'facture',
+}
+
+_RESOURCE_WORDS = {
+    'client': ('client', 'clients', 'clientèle', 'clientele'),
+    'article': ('article', 'articles', 'produit', 'produits'),
+    'devis': ('devis', 'quote', 'quotes', 'proforma'),
+    'facture': ('facture', 'factures', 'invoice', 'invoices'),
+}
 
 
 def _client_brief(client):
@@ -36,6 +67,29 @@ def _client_brief(client):
         "numTelClient1": client.numTelClient1,
         "numTelClient2": client.numTelClient2,
     }
+
+
+def _article_brief(article):
+    return {
+        "idArticle": article.idArticle,
+        "refArticle": article.refArticle,
+        "descArticle": article.descArticle,
+        "prixVenteUnitaire": str(article.prixVenteUnitaire),
+    }
+
+
+def _document_brief(doc, kind):
+    client = doc.client
+    brief = {
+        "id" + kind.capitalize(): getattr(doc, "id" + kind.capitalize()),
+        "code" + kind.capitalize(): getattr(doc, "code" + kind.capitalize()),
+        "date" + kind.capitalize(): str(getattr(doc, "date" + kind.capitalize())),
+        "codeClient": client.codeClient,
+        "nomPrenomClient": client.nomPrenomClient,
+        "statut" + kind.capitalize(): getattr(doc, "statut" + kind.capitalize()),
+        "nbLignes": doc.lignes.count(),
+    }
+    return brief
 
 
 def _search_clients(term):
@@ -56,15 +110,94 @@ def _search_clients(term):
     return qs.distinct()
 
 
+def _search_articles(term):
+    term = term.strip()
+    if not term:
+        return Article.objects.none()
+    return Article.objects.filter(
+        Q(refArticle__icontains=term) | Q(descArticle__icontains=term)
+    ).distinct()
+
+
+def _search_documents(model, term, kind):
+    term = term.strip()
+    if not term:
+        return model.objects.none()
+    code_field = 'code' + kind.capitalize()
+    qs = model.objects.filter(
+        Q(**{code_field + '__icontains': term})
+        | Q(client__codeClient__icontains=term)
+        | Q(client__nomPrenomClient__icontains=term)
+    )
+    if kind == 'facture':
+        qs = qs | model.objects.filter(devis__codeDevis__icontains=term)
+    return qs.distinct()
+
+
+def _brief(resource, obj):
+    if resource == 'client':
+        return _client_brief(obj)
+    if resource == 'article':
+        return _article_brief(obj)
+    return _document_brief(obj, resource)
+
+
+def _search(resource, term):
+    if resource == 'client':
+        return _search_clients(term)
+    if resource == 'article':
+        return _search_articles(term)
+    return _search_documents(_RESOURCES[resource], term, resource)
+
+
+def _resource_from_words(words):
+    """First word that names a resource, else None."""
+    for word in words:
+        key = word.lower().strip('.,:;!?')
+        if key in _ALIASES:
+            return _ALIASES[key]
+    return None
+
+
+def _strip_resource_words(text):
+    """Remove resource keywords, returning the leftover search term."""
+    words = [w for w in text.split()
+             if w.lower().strip('.,:;!?') not in _ALIASES]
+    return ' '.join(words).strip(' :,-')
+
+
 def _help():
     return {
         "intent": "help",
         "answer": (
-            "I can answer questions about clients: 'how many clients', "
-            "'find client <name/code/tax-id/phone>'. Client records can "
-            "also be listed and created via /api/client."
+            "I can answer questions about clients, articles, devis and "
+            "factures: 'how many clients', 'find article <ref>', "
+            "'find devis <code/client>'. Records can also be listed and "
+            "created via /api/client, /api/article, /api/devis, "
+            "/api/facture."
         ),
         "data": None,
+    }
+
+
+def _result(resource, term, items):
+    key = _PLURALS[resource]
+    noun = key if len(items) != 1 else resource
+    return {
+        "intent": "search",
+        "answer": f"{len(items)} {noun} matching '{term}'.",
+        "data": {"query": term, "resource": resource, key:
+                 [_brief(resource, o) for o in items]},
+    }
+
+
+def _count_answer(resource):
+    total = _RESOURCES[resource].objects.count()
+    noun = _PLURALS[resource] if total != 1 else resource
+    return {
+        "intent": "count",
+        "answer": f"{total} {noun} in the registry.",
+        "data": {"count": total, "resource": resource},
     }
 
 
@@ -74,51 +207,54 @@ def answer(question):
     if not isinstance(question, str) or not question.strip():
         return {
             "intent": "help",
-            "answer": "Ask me about clients — e.g. 'how many clients' or 'find client C001'.",
+            "answer": ("Ask me about clients, articles, devis or factures "
+                       "— e.g. 'how many articles' or 'find devis D001'."),
             "data": None,
         }
 
     text = question.strip()
 
-    if _INTENT_PATTERNS[0][1].search(text):  # count
-        total = Client.objects.count()
-        return {
-            "intent": "count",
-            "answer": f"{total} client{'s' if total != 1 else ''} in the registry.",
-            "data": {"count": total},
-        }
+    count_match = _COUNT_RE.search(text)
+    if count_match:
+        resource = _resource_from_words(count_match.group(2).split())
+        # "how many" with no resource word historically meant clients.
+        return _count_answer(resource or 'client')
 
-    search_match = _INTENT_PATTERNS[1][1].search(text)
+    search_match = _SEARCH_RE.search(text)
     if search_match:
-        term = (search_match.group(2) or "").strip(" :,-")
-        # Drop a leading "client(s)" the pattern left in the term.
-        term = re.sub(r"^clients?\s+", "", term, flags=re.IGNORECASE).strip(" :,-")
-        # Bare "client" or verb-only input → search the remaining words.
+        rest = (search_match.group(2) or "").strip(" :,-")
+        resource = _resource_from_words(rest.split())
+        term = _strip_resource_words(rest)
         if not term:
-            term = re.sub(r"\b(find|search|lookup|show|get|list|trouver|chercher|afficher|client)\b",
-                          "", text, flags=re.IGNORECASE).strip(" :,-")
-        clients = list(_search_clients(term)[:20])
-        return {
-            "intent": "search",
-            "answer": (
-                f"{len(clients)} client{'s' if len(clients) != 1 else ''} "
-                f"matching '{term}'."
-            ),
-            "data": {"query": term, "clients": [_client_brief(c) for c in clients]},
-        }
+            # Verb-only input ("find client") → fall back to bare-term scan.
+            term = _strip_resource_words(
+                re.sub(r"\b(find|search|lookup|show|get|list|trouver|"
+                       r"chercher|afficher)\b", "", text,
+                       flags=re.IGNORECASE))
+        resource = resource or 'client'
+        items = list(_search(resource, term)[:20])
+        return _result(resource, term, items)
 
-    # No recognized intent: treat the whole text as a search term — a bare
-    # name or code should still find the client. Only trivially short input
-    # falls through to help.
+    # No recognized intent: a bare "<resource> <term>" or plain term still
+    # searches — resource word routes it, otherwise clients then articles.
+    words = text.split()
+    resource = _resource_from_words(words)
+    term = _strip_resource_words(text)
+    if resource and term:
+        items = list(_search(resource, term)[:20])
+        return _result(resource, term, items)
+
     if len(text) >= 3:
         clients = list(_search_clients(text)[:20])
+        if clients:
+            return _result('client', text, clients)
+        articles = list(_search_articles(text)[:20])
+        if articles:
+            return _result('article', text, articles)
         return {
             "intent": "search",
-            "answer": (
-                f"{len(clients)} client{'s' if len(clients) != 1 else ''} "
-                f"matching '{text}'."
-            ),
-            "data": {"query": text, "clients": [_client_brief(c) for c in clients]},
+            "answer": f"0 results matching '{text}'.",
+            "data": {"query": text, "resource": None, "results": []},
         }
 
     return _help()
