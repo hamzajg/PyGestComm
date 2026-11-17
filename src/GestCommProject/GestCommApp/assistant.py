@@ -5,7 +5,8 @@ set of intents onto ORM queries and returns structured results. A future
 LLM front-end (the orca/al-minhej pattern) would translate free text into
 these same intents — the contract stays stable either way.
 
-Resources: clients, articles, devis (quotes), factures (invoices).
+Resources: clients, articles, devis (quotes), factures (invoices),
+bonlivs (delivery notes).
 
 Intents today (KISS — extend only when a real caller needs it):
   - count        "how many clients/articles/devis/factures"
@@ -18,7 +19,7 @@ import re
 
 from django.db.models import Q
 
-from GestCommApp.models import Article, Client, Devis, Facture
+from GestCommApp.models import Article, BonLiv, Client, Devis, Facture
 
 _COUNT_RE = re.compile(
     r"(how many|combien|nombre de|count|total)\s*(.*)", re.IGNORECASE)
@@ -31,11 +32,13 @@ _RESOURCES = {
     'article': Article,
     'devis': Devis,
     'facture': Facture,
+    'bonliv': BonLiv,
 }
 
 _PLURALS = {
     'client': 'clients', 'article': 'articles',
     'devis': 'devis', 'facture': 'factures',
+    'bonliv': 'bons de livraison',
 }
 
 # Plural/French aliases → canonical resource key.
@@ -48,6 +51,9 @@ _ALIASES = {
     'proforma': 'devis',
     'facture': 'facture', 'factures': 'facture',
     'invoice': 'facture', 'invoices': 'facture',
+    'bonliv': 'bonliv', 'bons de livraison': 'bonliv',
+    'livraison': 'bonliv', 'delivery': 'bonliv',
+    'delivery note': 'bonliv',
 }
 
 _RESOURCE_WORDS = {
@@ -55,6 +61,15 @@ _RESOURCE_WORDS = {
     'article': ('article', 'articles', 'produit', 'produits'),
     'devis': ('devis', 'quote', 'quotes', 'proforma'),
     'facture': ('facture', 'factures', 'invoice', 'invoices'),
+    'bonliv': ('bonliv', 'bons de livraison', 'livraison',
+               'delivery', 'delivery note'),
+}
+
+# Model-name suffix used in field names (statutBonLiv, not statutBonliv).
+_DOC_SUFFIX = {
+    'devis': 'Devis',
+    'facture': 'Facture',
+    'bonliv': 'BonLiv',
 }
 
 
@@ -79,14 +94,15 @@ def _article_brief(article):
 
 
 def _document_brief(doc, kind):
+    suffix = _DOC_SUFFIX[kind]
     client = doc.client
     brief = {
-        "id" + kind.capitalize(): getattr(doc, "id" + kind.capitalize()),
-        "code" + kind.capitalize(): getattr(doc, "code" + kind.capitalize()),
-        "date" + kind.capitalize(): str(getattr(doc, "date" + kind.capitalize())),
+        "id" + suffix: getattr(doc, "id" + suffix),
+        "code" + suffix: getattr(doc, "code" + suffix),
+        "date" + suffix: str(getattr(doc, "date" + suffix)),
         "codeClient": client.codeClient,
         "nomPrenomClient": client.nomPrenomClient,
-        "statut" + kind.capitalize(): getattr(doc, "statut" + kind.capitalize()),
+        "statut" + suffix: getattr(doc, "statut" + suffix),
         "nbLignes": doc.lignes.count(),
     }
     return brief
@@ -123,7 +139,7 @@ def _search_documents(model, term, kind):
     term = term.strip()
     if not term:
         return model.objects.none()
-    code_field = 'code' + kind.capitalize()
+    code_field = 'code' + _DOC_SUFFIX[kind]
     qs = model.objects.filter(
         Q(**{code_field + '__icontains': term})
         | Q(client__codeClient__icontains=term)
@@ -170,11 +186,11 @@ def _help():
     return {
         "intent": "help",
         "answer": (
-            "I can answer questions about clients, articles, devis and "
-            "factures: 'how many clients', 'find article <ref>', "
-            "'find devis <code/client>'. Records can also be listed and "
-            "created via /api/client, /api/article, /api/devis, "
-            "/api/facture."
+            "I can answer questions about clients, articles, devis, "
+            "factures and bons de livraison: 'how many clients', "
+            "'find article <ref>', 'find devis <code/client>'. Records "
+            "can also be listed and created via /api/client, "
+            "/api/article, /api/devis, /api/facture, /api/bonliv."
         ),
         "data": None,
     }
@@ -207,8 +223,9 @@ def answer(question):
     if not isinstance(question, str) or not question.strip():
         return {
             "intent": "help",
-            "answer": ("Ask me about clients, articles, devis or factures "
-                       "— e.g. 'how many articles' or 'find devis D001'."),
+            "answer": ("Ask me about clients, articles, devis, factures "
+                       "or bons de livraison — e.g. 'how many articles' "
+                       "or 'find devis D001'."),
             "data": None,
         }
 

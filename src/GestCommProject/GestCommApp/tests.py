@@ -612,3 +612,33 @@ class BonLivApiTest(AuthAPITestCase):
             self.client.delete(self.url + "/1").status_code,
             status.HTTP_400_BAD_REQUEST)
         self.assertEqual(BonLiv.objects.count(), 1)
+
+
+class AssistantBonLivApiTest(AuthAPITestCase):
+    url = "/api/assistant/ask"
+
+    def setUp(self):
+        super().setUp()
+        self.client_obj = Client.objects.create(**CLIENT)
+        BonLiv.objects.create(
+            codeBonLiv="BL009", client=self.client_obj,
+            statutBonLiv="valide")
+
+    def test_count_bons_de_livraison(self):
+        response = self.client.post(
+            self.url, {"question": "how many bons de livraison"},
+            format="json")
+        body = response.json()
+        self.assertEqual(body["intent"], "count")
+        self.assertEqual(body["data"]["count"], 1)
+        self.assertEqual(body["data"]["resource"], "bonliv")
+
+    def test_search_bonliv_by_code(self):
+        response = self.client.post(
+            self.url, {"question": "find bonliv BL009"}, format="json")
+        body = response.json()
+        self.assertEqual(body["intent"], "search")
+        items = body["data"]["bons de livraison"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["codeBonLiv"], "BL009")
+        self.assertEqual(items[0]["statutBonLiv"], "valide")
