@@ -2,9 +2,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import render
-from GestCommApp.models import Article, Client, Devis, Facture, LigneFacture
+from GestCommApp.models import (
+    Article, BonLiv, Client, Devis, Facture, LigneFacture)
 from GestCommApp.serializers import (
-    ArticleSerializer, ClientSerializer, DevisSerializer, FactureSerializer)
+    ArticleSerializer, BonLivSerializer, ClientSerializer, DevisSerializer,
+    FactureSerializer)
 from GestCommApp.assistant import answer as assistant_answer
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -57,7 +59,7 @@ class ArticleDetail(generics.RetrieveUpdateDestroyAPIView):
 
 def _document_queryset(request, model):
     qs = model.objects.prefetch_related('lignes__article')
-    suffix = model.__name__.capitalize()  # Devis → statutDevis/codeDevis
+    suffix = model.__name__  # Devis → statutDevis/codeDevis (BonLiv → BonLiv)
     statut = request.query_params.get('statut')
     if statut:
         qs = qs.filter(**{'statut' + suffix: statut})
@@ -90,14 +92,22 @@ class FactureList(generics.ListCreateAPIView):
         return _document_queryset(self.request, Facture)
 
 
+class BonLivList(generics.ListCreateAPIView):
+    serializer_class = BonLivSerializer
+
+    def get_queryset(self):
+        return _document_queryset(self.request, BonLiv)
+
+
 def _locked_detail(view, request, *args, **kwargs):
     """Reject writes on terminal-state documents."""
     instance = view.get_object()
     locked_statuts = {
         'Facture': (Facture.STATUT_PAYEE, Facture.STATUT_ANNULEE),
         'Devis': (Devis.STATUT_CONVERTI,),
+        'BonLiv': (BonLiv.STATUT_LIVRE, BonLiv.STATUT_ANNULE),
     }[type(instance).__name__]
-    statut_field = 'statut' + type(instance).__name__.capitalize()
+    statut_field = 'statut' + type(instance).__name__
     if getattr(instance, statut_field) in locked_statuts:
         return Response(
             {"detail": f"A '{getattr(instance, statut_field)}' "
@@ -123,6 +133,19 @@ class DevisDetail(generics.RetrieveUpdateDestroyAPIView):
 class FactureDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Facture.objects.prefetch_related('lignes__article')
     serializer_class = FactureSerializer
+
+    def update(self, request, *args, **kwargs):
+        blocked = _locked_detail(self, request, *args, **kwargs)
+        return blocked or super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        blocked = _locked_detail(self, request, *args, **kwargs)
+        return blocked or super().destroy(request, *args, **kwargs)
+
+
+class BonLivDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = BonLiv.objects.prefetch_related('lignes__article')
+    serializer_class = BonLivSerializer
 
     def update(self, request, *args, **kwargs):
         blocked = _locked_detail(self, request, *args, **kwargs)

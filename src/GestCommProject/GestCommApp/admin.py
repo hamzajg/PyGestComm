@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from GestCommApp.models import (
-    Article, Client, Devis, Facture, LigneDevis, LigneFacture)
+    Article, BonLiv, Client, Devis, Facture, LigneBonLiv, LigneDevis,
+    LigneFacture)
 
 
 class LigneDevisInline(admin.TabularInline):
@@ -11,6 +12,11 @@ class LigneDevisInline(admin.TabularInline):
 
 class LigneFactureInline(admin.TabularInline):
     model = LigneFacture
+    extra = 0
+
+
+class LigneBonLivInline(admin.TabularInline):
+    model = LigneBonLiv
     extra = 0
 
 
@@ -32,3 +38,8 @@ class DevisAdmin(admin.ModelAdmin):
 @admin.register(Facture)
 class FactureAdmin(admin.ModelAdmin):
     inlines = [LigneFactureInline]
+
+
+@admin.register(BonLiv)
+class BonLivAdmin(admin.ModelAdmin):
+    inlines = [LigneBonLivInline]

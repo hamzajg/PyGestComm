@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from GestCommApp.models import Article, Client, Devis, Facture
+from GestCommApp.models import Article, BonLiv, Client, Devis, Facture
 
 CLIENT = {
     "codeClient": "C001",
@@ -541,3 +541,74 @@ class ApiAuthTest(TestCase):
         response = self.client.get(
             '/api/client', HTTP_AUTHORIZATION='Basic ' + token)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+BONLIV = {
+    "codeBonLiv": "BL001",
+    "dateBonLiv": "2026-11-17",
+    "statutBonLiv": "brouillon",
+    "observationBonLiv": "Test delivery note",
+}
+
+
+class BonLivApiTest(AuthAPITestCase):
+    url = "/api/bonliv"
+
+    def setUp(self):
+        super().setUp()
+        self.client_obj = Client.objects.create(**CLIENT)
+        self.article = Article.objects.create(**{
+            **ARTICLE,
+            "prixVenteUnitaire": "100.00",
+            "tvaVente": 20,
+        })
+
+    def test_creates_a_bonliv_with_lines_and_totals(self):
+        payload = {
+            **BONLIV,
+            "client": self.client_obj.idClient,
+            "lignes": [{"article": self.article.idArticle, "quantite": 2}],
+        }
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        body = response.json()
+        self.assertEqual(body["codeBonLiv"], "BL001")
+        self.assertEqual(body["codeClient"], "C001")
+        self.assertEqual(len(body["lignes"]), 1)
+        self.assertEqual(body["lignes"][0]["designation"], "Widget")
+        self.assertEqual(body["totalHT"], 200)
+        self.assertEqual(body["totalTTC"], 240)
+
+    def test_updates_statut_and_lists_with_filters(self):
+        self.client.post(self.url, {
+            **BONLIV,
+            "client": self.client_obj.idClient,
+            "lignes": [{"designation": "Colis", "quantite": 1,
+                        "prixUnitaire": "10.00", "tva": 0}],
+        }, format="json")
+
+        response = self.client.patch(
+            self.url + "/1", {"statutBonLiv": "valide"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["statutBonLiv"], "valide")
+
+        listing = self.client.get(self.url + "?statut=valide")
+        self.assertEqual(len(listing.json()), 1)
+        self.assertEqual(
+            self.client.get(self.url + "?statut=livre").json(), [])
+
+    def test_livre_bonliv_rejects_patch_and_delete(self):
+        self.client.post(self.url, {
+            **BONLIV,
+            "client": self.client_obj.idClient,
+            "statutBonLiv": "livre",
+        }, format="json")
+
+        response = self.client.patch(
+            self.url + "/1", {"observationBonLiv": "x"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            self.client.delete(self.url + "/1").status_code,
+            status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(BonLiv.objects.count(), 1)

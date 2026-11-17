@@ -4,7 +4,8 @@ from django.db import transaction
 from rest_framework import serializers
 
 from GestCommApp.models import (
-    Article, Client, Devis, Facture, LigneDevis, LigneFacture)
+    Article, BonLiv, Client, Devis, Facture, LigneBonLiv, LigneDevis,
+    LigneFacture)
 
 CENT = Decimal('0.01')
 
@@ -206,4 +207,70 @@ class FactureSerializer(serializers.ModelSerializer):
             _save_lines(
                 LigneFacture, instance, lines, 'facture',
                 'prixVenteUnitaire')
+        return instance
+
+
+class LigneBonLivSerializer(serializers.ModelSerializer):
+    bonliv = serializers.PrimaryKeyRelatedField(read_only=True)
+    article = serializers.PrimaryKeyRelatedField(
+        queryset=Article.objects.all(), required=False, allow_null=True)
+    designation = serializers.CharField(
+        max_length=200, required=False, allow_blank=True)
+    totalHT = serializers.SerializerMethodField()
+    totalTVA = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LigneBonLiv
+        fields = '__all__'
+        read_only_fields = ('idLigneBonLiv',)
+
+    def get_totalHT(self, obj):
+        return _money(obj.total_ht)
+
+    def get_totalTVA(self, obj):
+        return _money(obj.total_tva)
+
+
+class BonLivSerializer(serializers.ModelSerializer):
+    lignes = LigneBonLivSerializer(many=True, required=False)
+    codeClient = serializers.CharField(
+        source='client.codeClient', read_only=True)
+    nomPrenomClient = serializers.CharField(
+        source='client.nomPrenomClient', read_only=True)
+    totalHT = serializers.SerializerMethodField()
+    totalTVA = serializers.SerializerMethodField()
+    totalTTC = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BonLiv
+        fields = '__all__'
+        read_only_fields = ('idBonLiv',)
+
+    def get_totalHT(self, obj):
+        return _money(_document_totals(obj)['totalHT'])
+
+    def get_totalTVA(self, obj):
+        return _money(_document_totals(obj)['totalTVA'])
+
+    def get_totalTTC(self, obj):
+        return _money(_document_totals(obj)['totalTTC'])
+
+    @transaction.atomic
+    def create(self, validated_data):
+        lines = validated_data.pop('lignes', [])
+        bonliv = BonLiv.objects.create(**validated_data)
+        _save_lines(LigneBonLiv, bonliv, lines, 'bonliv',
+                    'prixVenteUnitaire')
+        return bonliv
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        lines = validated_data.pop('lignes', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if lines is not None:
+            instance.lignes.all().delete()
+            _save_lines(LigneBonLiv, instance, lines, 'bonliv',
+                        'prixVenteUnitaire')
         return instance
