@@ -96,6 +96,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'GestCommProject.wsgi.application'
 
 
+REST_FRAMEWORK = {
+    # Session auth keeps the browsable API / admin working; Basic auth is
+    # what API clients (e.g. Gest_Comm_ClientFX) send as
+    # "Authorization: Basic base64(user:pass)".
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Basic first so API clients get a proper 401 + WWW-Authenticate;
+        # Session stays for the browsable API / admin (no Authorization
+        # header → Basic returns None → Session takes over).
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+
 # Database
 # https://docs.djangoproject.com/en/2.0/ref/settings/#databases
 
