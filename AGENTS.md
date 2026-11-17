@@ -59,6 +59,9 @@ replaces the whole set; omit it to keep existing lines.
 List endpoints accept `?search=` (icontains on code/name/reference —
 factures also match the linked `devis.codeDevis`), and devis/facture
 lists additionally accept `?statut=` and `?client=<idClient>`.
+Document codes (`codeDevis`/`codeFacture`/`codeBonLiv`) are optional on
+create — blank/missing gets `DEV-`/`FAC-`/`BL-` + next sequence number
+(max trailing digits + 1); explicit codes are stored verbatim.
 Terminal-state documents are read-only: factures `payee`/`annulee` and
 devis `converti` reject PUT/PATCH/DELETE with 400.
 

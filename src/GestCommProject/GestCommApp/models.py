@@ -64,7 +64,7 @@ class Devis(models.Model):
     ]
 
     idDevis = models.AutoField(primary_key=True)
-    codeDevis = models.CharField(max_length=20)
+    codeDevis = models.CharField(max_length=20, blank=True)
     dateDevis = models.DateField(default=timezone.localdate)
     client = models.ForeignKey(
         Client, on_delete=models.PROTECT, related_name='devis')
@@ -130,7 +130,7 @@ class Facture(models.Model):
     ]
 
     idFacture = models.AutoField(primary_key=True)
-    codeFacture = models.CharField(max_length=20)
+    codeFacture = models.CharField(max_length=20, blank=True)
     dateFacture = models.DateField(default=timezone.localdate)
     client = models.ForeignKey(
         Client, on_delete=models.PROTECT, related_name='factures')
@@ -203,7 +203,7 @@ class BonLiv(models.Model):
     ]
 
     idBonLiv = models.AutoField(primary_key=True)
-    codeBonLiv = models.CharField(max_length=20)
+    codeBonLiv = models.CharField(max_length=20, blank=True)
     dateBonLiv = models.DateField(default=timezone.localdate)
     client = models.ForeignKey(
         Client, on_delete=models.PROTECT, related_name='bonlivs')

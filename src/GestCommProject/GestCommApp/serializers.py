@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.db import transaction
@@ -76,6 +77,29 @@ def _save_lines(line_model, document, lines_data, fk_name, price_field):
         line_model.objects.create(**{fk_name: document}, **data)
 
 
+# Document auto-numbering (specs/document-numbering): when a create
+# payload omits the code, assign PREFIX + next sequence number. The
+# sequence is the max trailing digit run among codes carrying the
+# prefix, so deletions never cause reuse.
+_CODE_PREFIXES = {'codeDevis': 'DEV-', 'codeFacture': 'FAC-',
+                  'codeBonLiv': 'BL-'}
+_CODE_MODELS = {'codeDevis': Devis, 'codeFacture': Facture,
+                'codeBonLiv': BonLiv}
+
+
+def _next_document_code(field_name):
+    model = _CODE_MODELS[field_name]
+    prefix = _CODE_PREFIXES[field_name]
+    highest = 0
+    for code in model.objects.filter(
+            **{field_name + '__startswith': prefix}
+    ).values_list(field_name, flat=True):
+        match = re.search(r'(\d+)$', code)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return '%s%04d' % (prefix, highest + 1)
+
+
 class LigneDevisSerializer(serializers.ModelSerializer):
     devis = serializers.PrimaryKeyRelatedField(read_only=True)
     article = serializers.PrimaryKeyRelatedField(
@@ -124,6 +148,8 @@ class DevisSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         lines = validated_data.pop('lignes', [])
+        if not validated_data.get('codeDevis'):
+            validated_data['codeDevis'] = _next_document_code('codeDevis')
         devis = Devis.objects.create(**validated_data)
         _save_lines(LigneDevis, devis, lines, 'devis', 'prixVenteUnitaire')
         return devis
@@ -191,6 +217,9 @@ class FactureSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         lines = validated_data.pop('lignes', [])
+        if not validated_data.get('codeFacture'):
+            validated_data['codeFacture'] = _next_document_code(
+                'codeFacture')
         facture = Facture.objects.create(**validated_data)
         _save_lines(LigneFacture, facture, lines, 'facture',
                     'prixVenteUnitaire')
@@ -258,6 +287,8 @@ class BonLivSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         lines = validated_data.pop('lignes', [])
+        if not validated_data.get('codeBonLiv'):
+            validated_data['codeBonLiv'] = _next_document_code('codeBonLiv')
         bonliv = BonLiv.objects.create(**validated_data)
         _save_lines(LigneBonLiv, bonliv, lines, 'bonliv',
                     'prixVenteUnitaire')
