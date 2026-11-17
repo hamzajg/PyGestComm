@@ -1,15 +1,15 @@
 {
   "feature": "tls-termination",
-  "status": "running",
+  "status": "done",
   "iterations": 0,
-  "updated": "2026-11-17T21:02:23Z",
+  "updated": "2026-11-17T21:02:32Z",
   "waves": {
     "1": {
-      "status": "in-progress",
+      "status": "done",
       "branch": "feat/tls-termination-w1",
       "pr": "\u2014",
-      "evidence": "\u2014",
-      "updated": "2026-11-17T21:02:23Z"
+      "evidence": "settings verified both modes via django.setup(); manage.py test 52/52 OK; check clean; Caddyfile + DEPLOYMENT.md added; ",
+      "updated": "2026-11-17T21:02:27Z"
     }
   },
   "gates": {
@@ -17,10 +17,18 @@
       "status": "met",
       "evidence": "specs/tls-termination/SPEC.md frozen",
       "updated": "2026-11-17T21:02:23Z"
+    },
+    "G2": {
+      "status": "met",
+      "evidence": "python manage.py test -> Ran 52 tests OK; manage.py check clean; secure ON verified: redirect/proxy/hsts/cookies all ena",
+      "updated": "2026-11-17T21:02:30Z"
     }
   },
   "events": [
     "2026-11-17T21:02:23Z gate G1 met: specs/tls-termination/SPEC.md frozen",
-    "2026-11-17T21:02:23Z start wave 1 on feat/tls-termination-w1"
+    "2026-11-17T21:02:23Z start wave 1 on feat/tls-termination-w1",
+    "2026-11-17T21:02:27Z complete wave 1: settings verified both modes via django.setup(); manage.py test 52/52 OK; check clean; Caddyfile + DEPLOYMENT.md added; ",
+    "2026-11-17T21:02:30Z gate G2 met: python manage.py test -> Ran 52 tests OK; manage.py check clean; secure ON verified: redirect/proxy/hsts/cookies all ena",
+    "2026-11-17T21:02:32Z feature validated and shipped"
   ]
 }
