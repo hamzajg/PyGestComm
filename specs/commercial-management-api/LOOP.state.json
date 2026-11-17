@@ -1,0 +1,26 @@
+{
+  "feature": "commercial-management-api",
+  "status": "running",
+  "iterations": 1,
+  "updated": "2026-11-17T20:58:44Z",
+  "waves": {
+    "1": {
+      "status": "in-progress",
+      "branch": "feat/commercial-management-api-w1",
+      "pr": "\u2014",
+      "evidence": "\u2014",
+      "updated": "2026-11-17T20:58:44Z"
+    }
+  },
+  "gates": {
+    "G1": {
+      "status": "met",
+      "evidence": "specs/commercial-management-api/SPEC.md \u2014 scope in/out + 4 ACs frozen",
+      "updated": "2026-11-17T20:58:40Z"
+    }
+  },
+  "events": [
+    "2026-11-17T20:58:40Z gate G1 met: specs/commercial-management-api/SPEC.md \u2014 scope in/out + 4 ACs frozen",
+    "2026-11-17T20:58:44Z start wave 1 on feat/commercial-management-api-w1"
+  ]
+}
