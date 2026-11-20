@@ -1,6 +1,9 @@
 import re
 from decimal import Decimal
 
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
 
@@ -305,3 +308,52 @@ class BonLivSerializer(serializers.ModelSerializer):
             _save_lines(LigneBonLiv, instance, lines, 'bonliv',
                         'prixVenteUnitaire')
         return instance
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Identity of the signed-in account, as the desktop client sees it.
+
+    The role is derived here, never supplied by the caller: `is_staff` is the
+    flag Django admin already gates on, so accounts created before this
+    endpoint keep working without a migration (SPEC D1).
+    """
+
+    firstName = serializers.CharField(
+        source='first_name', required=False, allow_blank=True)
+    lastName = serializers.CharField(
+        source='last_name', required=False, allow_blank=True)
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'firstName', 'lastName', 'email', 'role')
+        read_only_fields = ('id', 'username', 'role')
+
+    def get_role(self, obj):
+        return 'admin' if obj.is_staff else 'operator'
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """Self-service password change: the current password is the proof."""
+
+    currentPassword = serializers.CharField(write_only=True)
+    newPassword = serializers.CharField(write_only=True)
+
+    def validate_currentPassword(self, value):
+        if not self.context['request'].user.check_password(value):
+            raise serializers.ValidationError(
+                'Mot de passe actuel incorrect.')
+        return value
+
+    def validate_newPassword(self, value):
+        try:
+            validate_password(value, self.context['request'].user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+    def save(self, **kwargs):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['newPassword'])
+        user.save(update_fields=['password'])
+        return user

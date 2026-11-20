@@ -862,3 +862,113 @@ class ProtectedDeleteApiTest(AuthAPITestCase):
             self.client.get(
                 "/api/client/%d" % self.client_obj.idClient).status_code,
             status.HTTP_404_NOT_FOUND)
+
+
+class UserProfileApiTest(AuthAPITestCase):
+    """`GET /api/me` — the identity the desktop client signs in with."""
+
+    url = "/api/me"
+
+    def test_returns_identity_and_operator_role(self):
+        self.user.first_name = "Ada"
+        self.user.last_name = "Lovelace"
+        self.user.email = "ada@example.com"
+        self.user.save()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), {
+            "id": self.user.id,
+            "username": "api-user",
+            "firstName": "Ada",
+            "lastName": "Lovelace",
+            "email": "ada@example.com",
+            "role": "operator",
+        })
+
+    def test_staff_account_is_admin(self):
+        self.user.is_staff = True
+        self.user.save()
+
+        self.assertEqual(
+            self.client.get(self.url).json()["role"], "admin")
+
+    def test_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        self.assertEqual(
+            self.client.get(self.url).status_code,
+            status.HTTP_401_UNAUTHORIZED)
+
+    def test_patch_updates_profile_fields_but_never_the_role(self):
+        response = self.client.patch(self.url, {
+            "firstName": "Grace",
+            "lastName": "Hopper",
+            "email": "grace@example.com",
+            "role": "admin",
+            "username": "someone-else",
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Grace")
+        self.assertEqual(self.user.last_name, "Hopper")
+        self.assertEqual(self.user.email, "grace@example.com")
+        self.assertEqual(self.user.username, "api-user")
+        self.assertFalse(self.user.is_staff)
+        self.assertEqual(response.json()["role"], "operator")
+
+
+class PasswordChangeApiTest(APITestCase):
+    """`POST /api/me/password` — self-service rotation (SPEC us4)."""
+
+    url = "/api/me/password"
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "operator", password="ancien-mot-de-passe")
+
+    def test_changes_the_password_when_the_current_one_matches(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(self.url, {
+            "currentPassword": "ancien-mot-de-passe",
+            "newPassword": "nouveau-mot-de-passe",
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("nouveau-mot-de-passe"))
+
+    def test_rejects_a_wrong_current_password(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(self.url, {
+            "currentPassword": "pas-le-bon",
+            "newPassword": "nouveau-mot-de-passe",
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("currentPassword", response.json())
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("ancien-mot-de-passe"))
+
+    def test_rejects_a_new_password_that_fails_the_validators(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(self.url, {
+            "currentPassword": "ancien-mot-de-passe",
+            "newPassword": "123",
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("newPassword", response.json())
+
+    def test_requires_authentication(self):
+        response = self.client.post(self.url, {
+            "currentPassword": "ancien-mot-de-passe",
+            "newPassword": "nouveau-mot-de-passe",
+        }, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
