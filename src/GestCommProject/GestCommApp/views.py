@@ -6,7 +6,7 @@ from GestCommApp.models import (
     Article, BonLiv, Client, Devis, Facture, LigneFacture)
 from GestCommApp.serializers import (
     ArticleSerializer, BonLivSerializer, ClientSerializer, DevisSerializer,
-    FactureSerializer)
+    FactureSerializer, PasswordChangeSerializer, UserProfileSerializer)
 from GestCommApp.assistant import answer as assistant_answer
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -256,3 +256,28 @@ class AssistantAsk(APIView):
     def post(self, request):
         question = request.data.get("question", "")
         return Response(assistant_answer(question))
+
+
+class MeView(APIView):
+    """The signed-in account: identity, e-mail and derived role."""
+
+    def get(self, request):
+        return Response(UserProfileSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = UserProfileSerializer(
+            request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class PasswordChangeView(APIView):
+    """Self-service password change (SPEC D1/us4)."""
+
+    def post(self, request):
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -33,6 +33,8 @@ urlpatterns = [
     path('api/bonliv', views.BonLivList.as_view()),
     path('api/bonliv/<int:pk>', views.BonLivDetail.as_view()),
     path('api/assistant/ask', views.AssistantAsk.as_view()),
+    path('api/me', views.MeView.as_view()),
+    path('api/me/password', views.PasswordChangeView.as_view()),
     path('api/token', TokenObtainPairView.as_view()),
     path('api/token/refresh', TokenRefreshView.as_view()),
     path('api/token/verify', TokenVerifyView.as_view()),
