@@ -90,6 +90,15 @@ icontains) on all five resources, plus `?statut=` and `?client=<id>` on
 devis/factures. Invoices in `payee`/`annulee` and devis in `converti`
 are read-only — writes return 400.
 
+Deleting a record that documents still reference answers **409 Conflict**
+(the `PROTECT` foreign keys are deliberate), with a body naming what
+blocks it:
+
+```json
+{"detail": "This client cannot be deleted: still referenced by 1 devis.",
+ "protected": [{"model": "devis", "label": "devis", "count": 1}]}
+```
+
 Documents (`devis`, `facture`) accept a `lignes` array on create and on
 update (update replaces the whole set). A line needs either `article`
 (id — designation, price, discount and VAT default from it) or explicit
@@ -101,7 +110,7 @@ update (update replaces the whole set). A line needs either `article`
 python manage.py test
 ```
 
-41 tests covering auth enforcement, the client/article endpoints,
+61 tests covering auth enforcement, the client/article endpoints,
 devis/facture creation with nested lines and totals, status updates,
 conversion, list filters, terminal-state locks, and the assistant
 intents.

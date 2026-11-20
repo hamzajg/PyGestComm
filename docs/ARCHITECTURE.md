@@ -72,9 +72,14 @@ unit price, either explicitly or from its linked `article`.
 
 List endpoints filter via query params (`?search=`, plus `?statut=` and
 `?client=` on documents) implemented in `get_queryset` — no django-filter
-dependency. Terminal-state documents (facture `payee`/`annulee`, devis
-`converti`) are read-only: writes return 400 — enforced in the detail
+dependency. Terminal-state documents (facture `payee`/`annulee`, devis `converti`) are read-only: writes return 400 — enforced in the detail
 views, not the serializer, so it applies to PUT/PATCH/DELETE alike.
+
+Referential integrity is a first-class answer, not a crash:
+`ProtectedDeleteMixin` (`views.py`) converts Django's `ProtectedError`
+into **409 Conflict** with a `detail` sentence plus per-model
+`protected` counts, on all five detail views. PROTECT still prevents a
+document from losing its client/article (specs/protected-delete-conflict).
 
 ## Data
 

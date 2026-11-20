@@ -48,3 +48,5 @@ pip-selfcheck.json
 # Local development database
 *.sqlite3
 src/GestCommProject/db.sqlite3
+# OpenHarness local scratch (evidence bundles, run logs)
+.openharness/
