@@ -41,8 +41,8 @@ Optional; this is a post-release learning record, not a finish gate.
 ## Walkthrough — live server, 2026-11-20
 
 Backend: `manage.py runserver 127.0.0.1:8000` (dev DB, user `admin`).
-Driver: `factory/scratch/gestcomm-e2e/e2e_smoke.py` (37 HTTP checks, no
-Django imports), recorded as evidence step `s2`.
+Driver: the harness scratch smoke script kept outside this repo (37 HTTP
+checks, stdlib only, no Django imports), recorded as evidence step `s2`.
 
 | Check | Command / request | Observed |
 |---|---|---|
@@ -54,4 +54,4 @@ Django imports), recorded as evidence step `s2`.
 | Whole lifecycle | 37 checks | 37/37 passed, no 5xx |
 
 Not verified here: how a human reads the 409 in the desktop window — that
-is `Gest_Comm_ClientFX/specs/delete-conflict-ux`.
+is the sibling `delete-conflict-ux` spec in Gest_Comm_ClientFX.
