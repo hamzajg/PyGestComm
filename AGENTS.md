@@ -21,7 +21,7 @@ Verified 2026-11-13 against CI (`.github/workflows/ci.yml`) and README.
 | Install deps | `pip install -r requirements.txt` |
 | Migrate | `cd src/GestCommProject && python manage.py migrate` |
 | Run dev server | `cd src/GestCommProject && python manage.py runserver` |
-| Test | `cd src/GestCommProject && python manage.py test` (41 tests) |
+| Test | `cd src/GestCommProject && python manage.py test` (61 tests) |
 | Django checks | `python manage.py check` |
 
 Requires: env vars per README — `DJANGO_SECRET_KEY` (required unless
@@ -64,6 +64,14 @@ create — blank/missing gets `DEV-`/`FAC-`/`BL-` + next sequence number
 (max trailing digits + 1); explicit codes are stored verbatim.
 Terminal-state documents are read-only: factures `payee`/`annulee` and
 devis `converti` reject PUT/PATCH/DELETE with 400.
+
+Deleting a record that other rows still reference answers **409
+Conflict** — `on_delete=PROTECT` is intentional, and the uncaught
+`ProtectedError` used to escape as a 500. The body is
+`{"detail": "<sentence naming the blocking records>", "protected":
+[{"model": "devis", "label": "devis", "count": 1}]}`; see
+`ProtectedDeleteMixin` in `views.py` and
+`specs/protected-delete-conflict/`.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|

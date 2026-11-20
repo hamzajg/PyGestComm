@@ -781,3 +781,84 @@ class DocumentNumberingTest(AuthAPITestCase):
             'client': self.client_obj.idClient,
             'dateDevis': '2026-11-17'})
         self.assertEqual(r.json()['codeDevis'], 'DEV-0043')
+
+
+class ProtectedDeleteApiTest(AuthAPITestCase):
+    """A referentially-protected delete is a 409, never a 500.
+
+    Scenarios: Deleting a client used by a document returns a conflict /
+    Deleting an article used by a document line returns a conflict /
+    Deleting a quote referenced by an invoice returns a conflict /
+    Deleting an unreferenced client still succeeds
+    (specs/protected-delete-conflict).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.client_obj = Client.objects.create(**CLIENT)
+        self.article = Article.objects.create(**ARTICLE)
+
+    def test_deleting_a_referenced_client_returns_conflict(self):
+        Devis.objects.create(**{**DEVIS, "client": self.client_obj})
+        Facture.objects.create(**{**FACTURE, "client": self.client_obj})
+
+        response = self.client.delete(
+            "/api/client/%d" % self.client_obj.idClient)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        body = response.json()
+        self.assertIn("cannot be deleted", body["detail"])
+        counts = {item["model"]: item["count"] for item in body["protected"]}
+        self.assertEqual(counts, {"devis": 1, "facture": 1})
+        self.assertEqual(Client.objects.count(), 1)
+
+    def test_deleting_a_referenced_article_returns_conflict(self):
+        devis = Devis.objects.create(
+            **{**DEVIS, "client": self.client_obj})
+        devis.lignes.create(article=self.article, designation="Widget",
+                            quantite=1, prixUnitaire="100.00", tva=20)
+        BonLiv.objects.create(**{**BONLIV, "client": self.client_obj})
+        bonliv = BonLiv.objects.get()
+        bonliv.lignes.create(article=self.article, designation="Widget",
+                             quantite=1, prixUnitaire="100.00", tva=20)
+
+        response = self.client.delete(
+            "/api/article/%d" % self.article.idArticle)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        counts = {item["model"]: item["count"]
+                  for item in response.json()["protected"]}
+        self.assertEqual(counts, {"lignedevis": 1, "lignebonliv": 1})
+        self.assertEqual(Article.objects.count(), 1)
+
+    def test_deleting_a_quote_referenced_by_an_invoice_returns_conflict(self):
+        devis = Devis.objects.create(**{**DEVIS, "client": self.client_obj})
+        Facture.objects.create(
+            **{**FACTURE, "client": self.client_obj, "devis": devis})
+
+        response = self.client.delete("/api/devis/%d" % devis.idDevis)
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("facture", response.json()["detail"])
+        self.assertEqual(Devis.objects.count(), 1)
+
+    def test_terminal_state_lock_still_wins_over_the_conflict(self):
+        devis = Devis.objects.create(
+            **{**DEVIS, "client": self.client_obj,
+               "statutDevis": Devis.STATUT_CONVERTI})
+        Facture.objects.create(
+            **{**FACTURE, "client": self.client_obj, "devis": devis})
+
+        response = self.client.delete("/api/devis/%d" % devis.idDevis)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unreferenced_client_still_deletes(self):
+        response = self.client.delete(
+            "/api/client/%d" % self.client_obj.idClient)
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(
+            self.client.get(
+                "/api/client/%d" % self.client_obj.idClient).status_code,
+            status.HTTP_404_NOT_FOUND)

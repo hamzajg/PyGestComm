@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import ProtectedError, Q
 from django.http import Http404
 from django.shortcuts import render
 from GestCommApp.models import (
@@ -13,6 +13,47 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 # Create your views here.
+
+
+class ProtectedDeleteMixin:
+    """Answer 409 Conflict when `on_delete=PROTECT` blocks a delete.
+
+    PROTECT is deliberate: a document must never lose the client or
+    article it references. Ignoring the raised `ProtectedError` turned
+    that business rule into an HTTP 500, so the conflict is reported as a
+    normal answer naming the records that still reference the object
+    (specs/protected-delete-conflict).
+    """
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError as exc:
+            protected = _protected_summary(exc)
+            model = self.get_queryset().model._meta.verbose_name
+            references = ', '.join(
+                "%d %s" % (item['count'], item['label'])
+                for item in protected)
+            return Response(
+                {
+                    'detail': f"This {model} cannot be deleted: still "
+                              f"referenced by {references}.",
+                    'protected': protected,
+                },
+                status=status.HTTP_409_CONFLICT)
+
+
+def _protected_summary(exc):
+    """Count the blocked objects per model, deterministically ordered."""
+    counts = {}
+    for obj in exc.protected_objects:
+        meta = type(obj)._meta
+        key = (meta.model_name, str(meta.verbose_name_plural))
+        counts[key] = counts.get(key, 0) + 1
+    return [
+        {'model': model, 'label': label, 'count': count}
+        for (model, label), count in sorted(counts.items())
+    ]
 
 
 def _search_param(request, *fields):
@@ -37,7 +78,8 @@ class ClientList(generics.ListCreateAPIView):
         return qs.filter(query) if query else qs
 
 
-class ClientDetail(generics.RetrieveUpdateDestroyAPIView):
+class ClientDetail(ProtectedDeleteMixin,
+                   generics.RetrieveUpdateDestroyAPIView):
     queryset = Client.objects.all()
     serializer_class = ClientSerializer
 
@@ -52,7 +94,8 @@ class ArticleList(generics.ListCreateAPIView):
         return qs.filter(query) if query else qs
 
 
-class ArticleDetail(generics.RetrieveUpdateDestroyAPIView):
+class ArticleDetail(ProtectedDeleteMixin,
+                    generics.RetrieveUpdateDestroyAPIView):
     queryset = Article.objects.all()
     serializer_class = ArticleSerializer
 
@@ -117,7 +160,8 @@ def _locked_detail(view, request, *args, **kwargs):
     return None
 
 
-class DevisDetail(generics.RetrieveUpdateDestroyAPIView):
+class DevisDetail(ProtectedDeleteMixin,
+                  generics.RetrieveUpdateDestroyAPIView):
     queryset = Devis.objects.prefetch_related('lignes__article')
     serializer_class = DevisSerializer
 
@@ -130,7 +174,8 @@ class DevisDetail(generics.RetrieveUpdateDestroyAPIView):
         return blocked or super().destroy(request, *args, **kwargs)
 
 
-class FactureDetail(generics.RetrieveUpdateDestroyAPIView):
+class FactureDetail(ProtectedDeleteMixin,
+                    generics.RetrieveUpdateDestroyAPIView):
     queryset = Facture.objects.prefetch_related('lignes__article')
     serializer_class = FactureSerializer
 
@@ -143,7 +188,8 @@ class FactureDetail(generics.RetrieveUpdateDestroyAPIView):
         return blocked or super().destroy(request, *args, **kwargs)
 
 
-class BonLivDetail(generics.RetrieveUpdateDestroyAPIView):
+class BonLivDetail(ProtectedDeleteMixin,
+                   generics.RetrieveUpdateDestroyAPIView):
     queryset = BonLiv.objects.prefetch_related('lignes__article')
     serializer_class = BonLivSerializer
 

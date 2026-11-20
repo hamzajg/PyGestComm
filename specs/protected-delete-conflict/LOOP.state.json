@@ -1,0 +1,26 @@
+{
+  "feature": "protected-delete-conflict",
+  "status": "running",
+  "iterations": 2,
+  "updated": "2026-11-20T09:07:22Z",
+  "waves": {
+    "1": {
+      "status": "in-progress",
+      "branch": "feat/protected-delete-conflict-w1",
+      "pr": "\u2014",
+      "evidence": "\u2014",
+      "updated": "2026-11-20T09:07:22Z"
+    }
+  },
+  "gates": {
+    "G1": {
+      "status": "met",
+      "evidence": "file:specs/protected-delete-conflict/DECISION-REVIEW.md \u2014 verdict ACCEPT (7 lens scored; 409 mixin, PROTECT kept)",
+      "updated": "2026-11-20T09:05:59Z"
+    }
+  },
+  "events": [
+    "2026-11-20T09:05:59Z gate G1 met: file:specs/protected-delete-conflict/DECISION-REVIEW.md \u2014 verdict ACCEPT (7 lens scored; 409 mixin, PROTECT kept)",
+    "2026-11-20T09:07:22Z start wave 1 on feat/protected-delete-conflict-w1"
+  ]
+}
