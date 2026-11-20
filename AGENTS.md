@@ -152,6 +152,10 @@ Response adds read-only `totalHT`/`totalTVA` per line and
 ## Agent rules
 
 - Branch from `master`; name branches `feat/*`, `fix/*`, `chore/*`, `docs/*`.
+- Never add AI/assistant attribution to commit messages, PR bodies,
+  reviews or comments: no "generated with …" footer, no `Co-Authored-By:`
+  agent trailer, no robot-emoji signature line. A commit message ends at its
+  own last line, with no trailer block.
 - Docs-only changes still go through a PR; never commit to `master` directly.
 - Verify before claiming: run `python manage.py test` from
   `src/GestCommProject` and report the real result.
