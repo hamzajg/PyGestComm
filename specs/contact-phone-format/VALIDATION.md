@@ -55,9 +55,10 @@ evidence or a `## Manual verification` entry per AC.
      Preserved across ship_validate reruns; the delivery auditor
      still verifies each claim. -->
 
-- AC 6 — backed up the real dev DB to
-  `factory/scratch/gestcomm-e2e/phone-migration/db.before-0006.sqlite3`, then
-  ran `migrate` (0006 column type + 0007 data normalisation) against it →
+- AC 6 — copied the real dev database to the run's workspace scratch folder
+  (outside this repo; the copy is recorded in the evidence bundle's step
+  s5 notes), then ran `migrate` (0006 column type + 0007 data normalisation)
+  against the dev database →
   11 client rows survived: `numTelClient1` is `text` (`'20123456'`, `'123'`,
   `'555'` unchanged, no digit lost), every legacy integer `0` became `''`
   (`select count(*) ... where numTelClient1='0' or numTelClient2='0'` → 0),
@@ -65,7 +66,8 @@ evidence or a `## Manual verification` entry per AC.
   `s5`; a unit test cannot cover this, because the Django test database is
   created from scratch and never replays a populated table.
 - AC 1/2/5/7 — additionally proven against the running API, not only in the
-  suite: `bash factory/scratch/gestcomm-e2e/phone-migration/smoke.sh` →
+  the smoke script kept in that same workspace scratch folder (path in
+  evidence step s7) →
   POST keeps `0123456789`, POST canonicalises `+33 (0)6 12 34 56 78` to
   `+330612345678`, GET returns the same value, the assistant finds the client
   from `01 23 45 67 89`, `abc` is rejected 400 naming `numTelClient1`, and the

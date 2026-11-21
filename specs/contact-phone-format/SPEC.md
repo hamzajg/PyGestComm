@@ -52,6 +52,11 @@ tell "no phone" apart from the number `0`.
   `0612345678` and `06 12 34 56 78` find the client.
 - API documentation (`docs/api.md` or the repo's equivalent) updated for the
   changed field type.
+- Files: `src/GestCommProject/GestCommApp/models.py`,
+  `serializers.py`, `phones.py` (new), `assistant.py`, `tests.py`, the two
+  migrations under `src/GestCommProject/GestCommApp/migrations/`, plus
+  `docs/ARCHITECTURE.md`, `docs/adr/0010-contact-phone-format.md` and
+  `AGENTS.md`.
 
 ## Scope (out)
 
