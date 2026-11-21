@@ -10,11 +10,35 @@ from rest_framework import serializers
 from GestCommApp.models import (
     Article, BonLiv, Client, Devis, Facture, LigneBonLiv, LigneDevis,
     LigneFacture)
+from GestCommApp.phones import canonical_phone
 
 CENT = Decimal('0.01')
 
 
+class PhoneField(serializers.CharField):
+    """A phone number written in its canonical form.
+
+    Accepts the numeric payloads the deployed Gest_Comm_ClientFX still sends
+    and maps the legacy `0` ("empty") to an empty string — see
+    specs/contact-phone-format/SPEC.md D2. Rejects anything that is not an
+    optional `+` plus 4-20 digits once separators are stripped (D3).
+    """
+
+    default_error_messages = {
+        'invalid_phone': 'Numéro de téléphone invalide.',
+    }
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        try:
+            return canonical_phone(value)
+        except ValueError:
+            self.fail('invalid_phone')
+
+
 class ClientSerializer(serializers.ModelSerializer):
+    numTelClient1 = PhoneField(required=False, allow_blank=True)
+    numTelClient2 = PhoneField(required=False, allow_blank=True)
 
     class Meta:
         model = Client

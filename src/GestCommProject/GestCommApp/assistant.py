@@ -20,6 +20,7 @@ import re
 from django.db.models import Q
 
 from GestCommApp.models import Article, BonLiv, Client, Devis, Facture
+from GestCommApp.phones import searchable_phone
 
 _COUNT_RE = re.compile(
     r"(how many|combien|nombre de|count|total)\s*(.*)", re.IGNORECASE)
@@ -112,7 +113,6 @@ def _search_clients(term):
     term = term.strip()
     if not term:
         return Client.objects.none()
-    # Phones are IntegerFields — try a numeric match when the term is digits.
     qs = Client.objects.filter(
         Q(codeClient__icontains=term)
         | Q(nomPrenomClient__icontains=term)
@@ -120,9 +120,13 @@ def _search_clients(term):
         | Q(addresseClient1__icontains=term)
         | Q(addresseClient2__icontains=term)
     )
-    if term.isdigit():
+    # Phones are stored canonically, so a formatted term such as
+    # "06 12 34 56 78" is reduced to its digits before matching.
+    phone = searchable_phone(term)
+    if phone:
         qs = qs | Client.objects.filter(
-            Q(numTelClient1=int(term)) | Q(numTelClient2=int(term)))
+            Q(numTelClient1__contains=phone)
+            | Q(numTelClient2__contains=phone))
     return qs.distinct()
 
 
