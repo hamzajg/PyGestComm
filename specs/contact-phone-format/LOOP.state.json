@@ -1,9 +1,9 @@
 {
   "feature": "contact-phone-format",
   "status": "running",
-  "iterations": 2,
+  "iterations": 3,
   "review": "required",
-  "updated": "2026-11-21T16:19:17Z",
+  "updated": "2026-11-21T16:23:04Z",
   "waves": {
     "1": {
       "status": "in-progress",
