@@ -13,8 +13,8 @@ class Client(models.Model):
     matFiscalClient = models.CharField(max_length=100)
     addresseClient1 = models.CharField(max_length=100)
     addresseClient2 = models.CharField(max_length=100)
-    numTelClient1 = models.IntegerField()
-    numTelClient2 = models.IntegerField()
+    numTelClient1 = models.CharField(max_length=32, blank=True, default='')
+    numTelClient2 = models.CharField(max_length=32, blank=True, default='')
 
     def __str__(self):
         return '%d: %s' % (self.idClient, self.codeClient)

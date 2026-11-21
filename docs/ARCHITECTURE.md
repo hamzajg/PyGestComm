@@ -19,6 +19,7 @@ Django 5.2 + DRF 3.16 (runserver / WSGI)
                  BonLiv+LigneBonLiv
        ├─ serializers.py   ModelSerializers; documents nest `lignes` and
        │                   expose computed totalHT/totalTVA/totalTTC
+       ├─ phones.py        canonical phone text — one representation, validated
        ├─ assistant.py     deterministic copilot intents (count/search)
        ├─ admin.py         all models registered; lines as tabular inlines
        └─ views.py         generics.*APIView — ListCreate + RetrieveUpdateDestroy
@@ -33,7 +34,8 @@ sqlite3 (src/GestCommProject/db.sqlite3, gitignored dev DB)
 README always promised:
 
 - **Client** — legacy schema (`client` table, `codeClient`,
-  `numTelClient*` integers). Unchanged; now also supports
+  `numTelClient*` canonical text: optional leading `+`, digits only, `''` =
+  no phone — `phones.py`, ADR 0010). Also supports
   retrieve/update/delete at `/api/client/<id>`.
 - **Article** — `article` table; field set mirrors the
   `Gest_Comm_ClientFX` Article POJO (`refArticle`, `descArticle`,

@@ -11,8 +11,8 @@ CLIENT = {
     "matFiscalClient": "1234567",
     "addresseClient1": "1 Analytical Engine Way",
     "addresseClient2": "Suite 2",
-    "numTelClient1": 11111111,
-    "numTelClient2": 22222222,
+    "numTelClient1": "11111111",
+    "numTelClient2": "22222222",
 }
 
 
@@ -82,8 +82,8 @@ class AssistantApiTest(AuthAPITestCase):
         Client.objects.create(**{**CLIENT,
                                  "codeClient": "C002",
                                  "nomPrenomClient": "Grace Hopper",
-                                 "numTelClient1": 33333333,
-                                 "numTelClient2": 44444444})
+                                 "numTelClient1": "33333333",
+                                 "numTelClient2": "44444444"})
 
     def ask(self, question):
         return self.client.post(self.url, {"question": question}, format="json")
@@ -972,3 +972,93 @@ class PasswordChangeApiTest(APITestCase):
         }, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ClientPhoneFormatTests(AuthAPITestCase):
+    """Scenarios in `specs/contact-phone-format/EXAMPLES.feature`.
+
+    A phone number is an identifier, not a quantity: it is stored as canonical
+    text (optional leading `+`, digits only) so a leading zero survives
+    (SPEC.md D1). Integer-era payloads and the legacy `0` still work (D2).
+    """
+
+    url = "/api/client"
+
+    def create(self, **phones):
+        return self.client.post(self.url, {**CLIENT, **phones}, format="json")
+
+    def test_keeps_leading_zeros_through_create_and_list(self):
+        # Scenario: Phone numbers keep leading zeros
+        response = self.create(numTelClient1="0123456789")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Client.objects.get().numTelClient1, "0123456789")
+        self.assertEqual(
+            self.client.get(self.url).json()[0]["numTelClient1"], "0123456789")
+
+    def test_canonicalises_separators(self):
+        # Scenario: Formatted phone numbers are canonicalised
+        response = self.create(numTelClient1="01 23.45-67/89",
+                               numTelClient2="+33 (0)6 12 34 56 78")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        stored = Client.objects.get()
+        self.assertEqual(stored.numTelClient1, "0123456789")
+        self.assertEqual(stored.numTelClient2, "+330612345678")
+
+    def test_accepts_legacy_integer_payloads(self):
+        # Scenario: Legacy integer phone payloads are accepted
+        response = self.create(numTelClient1=11111111)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Client.objects.get().numTelClient1, "11111111")
+
+    def test_zero_and_blank_mean_no_phone(self):
+        # Scenario: Zero and blank mean no phone
+        response = self.create(numTelClient1=0, numTelClient2="")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        stored = Client.objects.get()
+        self.assertEqual(stored.numTelClient1, "")
+        self.assertEqual(stored.numTelClient2, "")
+        listed = self.client.get(self.url).json()[0]
+        self.assertEqual(listed["numTelClient1"], "")
+        self.assertEqual(listed["numTelClient2"], "")
+
+    def test_rejects_invalid_phones(self):
+        # Scenario: Invalid phone numbers are rejected
+        for bad in ("abc", "++33612345678", "1" * 21):
+            with self.subTest(bad=bad):
+                response = self.create(numTelClient1=bad)
+
+                self.assertEqual(
+                    response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("numTelClient1", response.json())
+                self.assertEqual(Client.objects.count(), 0)
+
+    def test_both_phone_fields_behave_identically(self):
+        # Scenario: Both phone fields behave identically
+        response = self.create(numTelClient1="01 23 45 67 89",
+                               numTelClient2="09.87.65.43.21")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        stored = Client.objects.get()
+        self.assertEqual(stored.numTelClient1, "0123456789")
+        self.assertEqual(stored.numTelClient2, "0987654321")
+
+    def test_assistant_finds_clients_by_phone(self):
+        # Scenario: Assistant finds clients by phone
+        Client.objects.create(**{**CLIENT, "numTelClient1": "0612345678"})
+
+        formatted = self.ask("find client 06 12 34 56 78")
+        canonical = self.ask("find client 0612345678")
+
+        for body in (formatted, canonical):
+            self.assertEqual(body["intent"], "search")
+            self.assertEqual(len(body["data"]["clients"]), 1)
+            self.assertEqual(
+                body["data"]["clients"][0]["numTelClient1"], "0612345678")
+
+    def ask(self, question):
+        return self.client.post(
+            "/api/assistant/ask", {"question": question}, format="json").json()

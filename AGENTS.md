@@ -95,7 +95,9 @@ Conflict** — `on_delete=PROTECT` is intentional, and the uncaught
 
 Client fields (`models.py`, table `client`): `idClient` (PK), `codeClient`,
 `nomPrenomClient`, `matFiscalClient`, `addresseClient1/2`,
-`numTelClient1/2` (IntegerField — note: numeric, not string).
+`numTelClient1/2` (CharField, canonical text — `+` optional, digits only,
+`''` = no phone; ADR 0010). Numeric payloads and `0` are still accepted on
+write for the deployed client.
 
 Article fields (table `article`): `idArticle` (PK), `refArticle`,
 `descArticle`, `prixAchatUnitaire`/`prixVenteUnitaire` (Decimal),
@@ -150,8 +152,9 @@ Response adds read-only `totalHT`/`totalTVA` per line and
 - Devis/facture JSON shapes are provisional — no `Gest_Comm_ClientFX`
   consumer exists yet for them; client/article shapes are the stable
   contract.
-- `numTelClient1/2` are `IntegerField` — phone numbers as ints; legacy
-  constraint, changing the type is a migration + client-coordination job.
+- `numTelClient1/2` are canonical text (`GestCommApp/phones.py`, ADR 0010).
+  The serializer still accepts integer payloads and maps `0` to `''` for the
+  deployed client; delete that rule once `Gest_Comm_ClientFX` sends strings.
 - `DJANGO_SECRET_KEY` has no safe default in production mode — required env.
 - `db.sqlite3` lives inside the project dir and is gitignored for dev.
 - Settings/urls files carry stale Django-2.0 docstring examples — ignore
